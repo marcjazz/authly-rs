@@ -1,4 +1,4 @@
-use authly_core::{Identity, OAuthProvider, OAuthToken};
+use authly_core::{Identity, OAuthProvider, OAuthToken, pkce::Pkce};
 use authly_flow::OAuth2Flow;
 use authly_session::{Session, SessionStore};
 use authly_token::TokenManager;
@@ -67,7 +67,8 @@ where
     P: OAuthProvider,
     M: authly_core::UserMapper,
 {
-    let (url, csrf_state) = flow.initiate_login(scopes);
+    let pkce = Pkce::new();
+    let (url, csrf_state) = flow.initiate_login(scopes, Some(&pkce.code_challenge));
 
     let mut cookie = Cookie::new("oauth_state", csrf_state);
     cookie.set_path("/");
@@ -75,6 +76,12 @@ where
     cookie.set_same_site(SameSite::Lax);
 
     cookies.add(cookie);
+
+    let mut pkce_cookie = Cookie::new("oauth_pkce_verifier", pkce.code_verifier);
+    pkce_cookie.set_path("/");
+    pkce_cookie.set_http_only(true);
+    pkce_cookie.set_same_site(SameSite::Lax);
+    cookies.add(pkce_cookie);
 
     Redirect::to(&url)
 }
@@ -94,13 +101,21 @@ where
         .map(|c| c.value().to_string())
         .unwrap_or_default();
 
-    // Remove the state cookie after use
-    let mut remove_cookie = Cookie::new("oauth_state", "");
-    remove_cookie.set_path("/");
-    cookies.remove(remove_cookie);
+    let pkce_verifier = cookies
+        .get("oauth_pkce_verifier")
+        .map(|c| c.value().to_string());
+
+    // Remove cookies after use
+    let mut remove_state = Cookie::new("oauth_state", "");
+    remove_state.set_path("/");
+    cookies.remove(remove_state);
+
+    let mut remove_pkce = Cookie::new("oauth_pkce_verifier", "");
+    remove_pkce.set_path("/");
+    cookies.remove(remove_pkce);
 
     let (identity, token, _local_user) = flow
-        .finalize_login(&params.code, &params.state, &expected_state)
+        .finalize_login(&params.code, &params.state, &expected_state, pkce_verifier.as_deref())
         .await
         .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Authentication failed: {}", e)))?;
 
