@@ -1,16 +1,17 @@
-use authly_axum::{handle_oauth_callback, initiate_oauth_login, AuthSession, OAuthCallbackParams, SessionConfig};
+use authly_axum::{
+    handle_oauth_callback, initiate_oauth_login, AuthSession, OAuthCallbackParams, SessionConfig,
+};
 use authly_flow::OAuth2Flow;
 use authly_providers_google::GoogleProvider;
-use authly_session::{Session, SessionStore};
+use authly_session::SessionStore;
 use axum::{
     extract::{Query, State},
     response::IntoResponse,
     routing::get,
     Router,
 };
-use std::collections::HashMap;
 use std::sync::Arc;
-use tower_cookies::{Cookies, CookieManagerLayer};
+use tower_cookies::{CookieManagerLayer, Cookies};
 
 #[derive(Clone)]
 struct AppState {
@@ -36,27 +37,23 @@ impl axum::extract::FromRef<AppState> for SessionConfig {
 async fn main() {
     dotenvy::dotenv().ok();
 
-    let client_id = std::env::var("AUTHLY_GOOGLE_CLIENT_ID")
-        .expect("AUTHLY_GOOGLE_CLIENT_ID must be set");
+    let client_id =
+        std::env::var("AUTHLY_GOOGLE_CLIENT_ID").expect("AUTHLY_GOOGLE_CLIENT_ID must be set");
     let client_secret = std::env::var("AUTHLY_GOOGLE_CLIENT_SECRET")
         .expect("AUTHLY_GOOGLE_CLIENT_SECRET must be set");
     let redirect_uri = std::env::var("AUTHLY_GOOGLE_REDIRECT_URI")
         .unwrap_or_else(|_| "http://localhost:3000/auth/google/callback".to_string());
 
-    let provider = GoogleProvider::new(
-        client_id,
-        client_secret,
-        redirect_uri,
-    );
+    let provider = GoogleProvider::new(client_id, client_secret, redirect_uri);
     let google_flow = Arc::new(OAuth2Flow::new(provider));
-    
+
     // Use Redis if REDIS_URL is set, otherwise fallback to MemoryStore
     let session_store: Arc<dyn SessionStore> = if let Ok(redis_url) = std::env::var("REDIS_URL") {
         println!("Using RedisStore at {}", redis_url);
         Arc::new(authly_session::RedisStore::new(&redis_url, "authly".into()).unwrap())
     } else {
         println!("Using MemoryStore");
-        Arc::new(MemoryStore::default())
+        Arc::new(authly_session::MemoryStore::default())
     };
 
     let state = AppState {
@@ -82,11 +79,12 @@ async fn index() -> impl IntoResponse {
     "Welcome! Go to /auth/google to login."
 }
 
-async fn google_login(
-    State(state): State<AppState>,
-    cookies: Cookies,
-) -> impl IntoResponse {
-    initiate_oauth_login(&state.google_flow, &cookies, &["openid", "email", "profile"])
+async fn google_login(State(state): State<AppState>, cookies: Cookies) -> impl IntoResponse {
+    initiate_oauth_login(
+        &state.google_flow,
+        &cookies,
+        &["openid", "email", "profile"],
+    )
 }
 
 async fn google_callback(
@@ -113,26 +111,4 @@ async fn protected(AuthSession(session): AuthSession) -> impl IntoResponse {
         session.identity.email,
         session.identity.attributes
     )
-}
-
-
-// Minimal MemoryStore for example
-#[derive(Default)]
-struct MemoryStore {
-    sessions: std::sync::Mutex<HashMap<String, Session>>,
-}
-
-#[async_trait::async_trait]
-impl SessionStore for MemoryStore {
-    async fn load_session(&self, id: &str) -> Result<Option<Session>, authly_core::AuthError> {
-        Ok(self.sessions.lock().unwrap().get(id).cloned())
-    }
-    async fn save_session(&self, session: &Session) -> Result<(), authly_core::AuthError> {
-        self.sessions.lock().unwrap().insert(session.id.clone(), session.clone());
-        Ok(())
-    }
-    async fn delete_session(&self, id: &str) -> Result<(), authly_core::AuthError> {
-        self.sessions.lock().unwrap().remove(id);
-        Ok(())
-    }
 }

@@ -100,7 +100,7 @@ async fn main() {
     let mapper = SqlxUserMapper {};
     let auth_flow = Arc::new(CredentialsFlow::with_mapper(provider, mapper));
     
-    let session_store = Arc::new(MemoryStore::default());
+    let session_store = Arc::new(authly_session::MemoryStore::default());
 
     let state = AppState {
         auth_flow,
@@ -164,25 +164,4 @@ async fn protected(AuthSession(session): AuthSession) -> impl IntoResponse {
         session.identity.external_id,
         session.id
     )
-}
-
-// Minimal MemoryStore for example
-#[derive(Default)]
-struct MemoryStore {
-    sessions: std::sync::Mutex<HashMap<String, Session>>,
-}
-
-#[async_trait::async_trait]
-impl SessionStore for MemoryStore {
-    async fn load_session(&self, id: &str) -> Result<Option<Session>, AuthError> {
-        Ok(self.sessions.lock().unwrap().get(id).cloned())
-    }
-    async fn save_session(&self, session: &Session) -> Result<(), AuthError> {
-        self.sessions.lock().unwrap().insert(session.id.clone(), session.clone());
-        Ok(())
-    }
-    async fn delete_session(&self, id: &str) -> Result<(), AuthError> {
-        self.sessions.lock().unwrap().remove(id);
-        Ok(())
-    }
 }
