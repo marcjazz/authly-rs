@@ -12,6 +12,15 @@ pub struct Identity {
     pub attributes: HashMap<String, String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthToken {
+    pub access_token: String,
+    pub token_type: String,
+    pub expires_in: Option<u64>,
+    pub refresh_token: Option<String>,
+    pub scope: Option<String>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum AuthError {
     #[error("Provider error: {0}")]
@@ -26,6 +35,8 @@ pub enum AuthError {
     Session(String),
     #[error("Token error: {0}")]
     Token(String),
+    #[error("CSRF state mismatch")]
+    CsrfMismatch,
 }
 
 /// Trait for an OAuth2-compatible provider.
@@ -35,7 +46,12 @@ pub trait OAuthProvider: Send + Sync {
     fn get_authorization_url(&self, state: &str, scopes: &[&str]) -> String;
     
     /// Exchange an authorization code for an Identity.
-    async fn exchange_code_for_identity(&self, code: &str) -> Result<Identity, AuthError>;
+    async fn exchange_code_for_identity(&self, code: &str) -> Result<(Identity, OAuthToken), AuthError>;
+
+    /// Refresh an access token using a refresh token.
+    async fn refresh_token(&self, _refresh_token: &str) -> Result<OAuthToken, AuthError> {
+        Err(AuthError::Provider("Token refresh not supported by this provider".into()))
+    }
 }
 
 /// Trait for a Credentials-based provider (e.g., Email/Password).

@@ -1,4 +1,4 @@
-use authly_core::{OAuthProvider, Identity, AuthError, CredentialsProvider};
+use authly_core::{OAuthProvider, Identity, AuthError, CredentialsProvider, OAuthToken};
 
 /// Orchestrates the Authorization Code flow.
 pub struct OAuth2Flow<P: OAuthProvider> {
@@ -18,9 +18,16 @@ impl<P: OAuthProvider> OAuth2Flow<P> {
     }
 
     /// Completes the flow by exchanging the code.
-    pub async fn finalize_login(&self, code: &str, _state: &str) -> Result<Identity, AuthError> {
-        // In a real flow, you'd verify _state matches the one from initiate_login
+    pub async fn finalize_login(&self, code: &str, received_state: &str, expected_state: &str) -> Result<(Identity, OAuthToken), AuthError> {
+        if received_state != expected_state {
+            return Err(AuthError::CsrfMismatch);
+        }
         self.provider.exchange_code_for_identity(code).await
+    }
+
+    /// Refresh an access token using a refresh token.
+    pub async fn refresh_access_token(&self, refresh_token: &str) -> Result<OAuthToken, AuthError> {
+        self.provider.refresh_token(refresh_token).await
     }
 }
 
