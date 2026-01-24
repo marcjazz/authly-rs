@@ -1,4 +1,4 @@
-use authly_axum::{AuthSession, SessionConfig};
+use authly_axum::{handle_oauth_callback, AuthSession, OAuthCallbackParams, SessionConfig};
 use authly_flow::OAuth2Flow;
 use authly_providers_github::GithubProvider;
 use authly_session::{Session, SessionStore};
@@ -97,48 +97,20 @@ async fn github_login(
     Redirect::to(&url)
 }
 
-#[derive(serde::Deserialize)]
-struct CallbackParams {
-    code: String,
-    state: String,
-}
-
 async fn github_callback(
     State(state): State<AppState>,
     cookies: Cookies,
-    Query(params): Query<CallbackParams>,
+    Query(params): Query<OAuthCallbackParams>,
 ) -> impl IntoResponse {
-    let expected_state = cookies
-        .get("oauth_state")
-        .map(|c| c.value().to_string())
-        .unwrap_or_default();
-
-    // Remove the state cookie after use
-    let mut remove_cookie = Cookie::new("oauth_state", "");
-    remove_cookie.set_path("/");
-    cookies.remove(remove_cookie);
-
-    let (identity, _token) = match state
-        .github_flow
-        .finalize_login(&params.code, &params.state, &expected_state)
-        .await
-    {
-        Ok((identity, token)) => (identity, token),
-        Err(e) => return format!("Authentication failed: {}", e).into_response(),
-    };
-
-    let session = Session {
-        id: uuid::Uuid::new_v4().to_string(),
-        identity,
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
-    };
-
-    state.session_store.save_session(&session).await.unwrap();
-
-    let cookie = state.session_config.create_cookie(session.id);
-    cookies.add(cookie);
-
-    Redirect::to("/protected").into_response()
+    handle_oauth_callback(
+        &state.github_flow,
+        cookies,
+        params,
+        state.session_store.clone(),
+        state.session_config.clone(),
+        "/protected",
+    )
+    .await
 }
 
 async fn protected(AuthSession(session): AuthSession) -> impl IntoResponse {

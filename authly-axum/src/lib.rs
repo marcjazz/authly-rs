@@ -1,13 +1,22 @@
 use async_trait::async_trait;
+use authly_core::OAuthProvider;
+use authly_flow::OAuth2Flow;
 use authly_session::{Session, SessionStore};
 use axum::{
     extract::{FromRef, FromRequestParts},
     http::{request::Parts, StatusCode},
+    response::{IntoResponse, Redirect},
 };
 use std::sync::Arc;
 pub use tower_cookies::cookie::SameSite;
 pub use tower_cookies::Cookie;
 use tower_cookies::Cookies;
+
+#[derive(serde::Deserialize)]
+pub struct OAuthCallbackParams {
+    pub code: String,
+    pub state: String,
+}
 
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
@@ -99,4 +108,69 @@ where
 
         Ok(AuthSession(session))
     }
+}
+
+/// Helper to handle the OAuth2 callback boilerplate.
+pub async fn handle_oauth_callback<P>(
+    flow: &OAuth2Flow<P>,
+    cookies: Cookies,
+    params: OAuthCallbackParams,
+    store: Arc<dyn SessionStore>,
+    config: SessionConfig,
+    success_url: &str,
+) -> Result<impl IntoResponse, (StatusCode, String)>
+where
+    P: OAuthProvider + Send + Sync,
+{
+    let expected_state = cookies
+        .get("oauth_state")
+        .map(|c| c.value().to_string())
+        .unwrap_or_default();
+
+    // Remove the state cookie after use
+    let mut remove_cookie = Cookie::new("oauth_state", "");
+    remove_cookie.set_path("/");
+    cookies.remove(remove_cookie);
+
+    let (mut identity, token) = flow
+        .finalize_login(&params.code, &params.state, &expected_state)
+        .await
+        .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Authentication failed: {}", e)))?;
+
+    // Store tokens in identity attributes
+    identity
+        .attributes
+        .insert("access_token".to_string(), token.access_token);
+
+    if let Some(expires_in) = token.expires_in {
+        let expires_at = chrono::Utc::now().timestamp() + expires_in as i64;
+        identity
+            .attributes
+            .insert("expires_at".to_string(), expires_at.to_string());
+    }
+
+    if let Some(rt) = token.refresh_token {
+        identity.attributes.insert("refresh_token".to_string(), rt);
+    }
+
+    let session = Session {
+        id: uuid::Uuid::new_v4().to_string(),
+        identity,
+        expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
+    };
+
+    store
+        .save_session(&session)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to save session: {}", e),
+            )
+        })?;
+
+    let cookie = config.create_cookie(session.id);
+    cookies.add(cookie);
+
+    Ok(Redirect::to(success_url).into_response())
 }
