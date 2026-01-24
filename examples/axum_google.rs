@@ -4,7 +4,7 @@ use authly_providers_google::GoogleProvider;
 use authly_session::{Session, SessionStore};
 use axum::{
     extract::{Query, State},
-    response::{IntoResponse, Redirect},
+    response::{IntoResponse, Json, Redirect},
     routing::get,
     Router,
 };
@@ -62,6 +62,7 @@ async fn main() {
         .route("/auth/google", get(google_login))
         .route("/auth/google/callback", get(google_callback))
         .route("/protected", get(protected))
+        .route("/refresh", get(refresh_handler))
         .layer(CookieManagerLayer::new())
         .with_state(state);
 
@@ -74,9 +75,19 @@ async fn index() -> impl IntoResponse {
     "Welcome! Go to /auth/google to login."
 }
 
-async fn google_login(State(state): State<AppState>) -> impl IntoResponse {
-    let (url, _csrf_state) = state.google_flow.initiate_login();
-    // In real app, store _csrf_state in a secure cookie
+async fn google_login(
+    State(state): State<AppState>,
+    cookies: Cookies,
+) -> impl IntoResponse {
+    let (url, csrf_state) = state.google_flow.initiate_login();
+    
+    let mut cookie = Cookie::new("oauth_state", csrf_state);
+    cookie.set_path("/");
+    cookie.set_http_only(true);
+    cookie.set_same_site(SameSite::Lax);
+    
+    cookies.add(cookie);
+    
     Redirect::to(&url)
 }
 
@@ -91,11 +102,29 @@ async fn google_callback(
     cookies: Cookies,
     Query(params): Query<CallbackParams>,
 ) -> impl IntoResponse {
-    let identity = state
+    let expected_state = cookies
+        .get("oauth_state")
+        .map(|c| c.value().to_string())
+        .unwrap_or_default();
+
+    // Remove the state cookie after use
+    let mut remove_cookie = Cookie::new("oauth_state", "");
+    remove_cookie.set_path("/");
+    cookies.remove(remove_cookie);
+
+    let (identity, _token) = match state
         .google_flow
-        .finalize_login(&params.code, &params.state)
+        .finalize_login(&params.code, &params.state, &expected_state)
         .await
-        .unwrap();
+    {
+        Ok((identity, token)) => (identity, token),
+        Err(e) => return format!("Authentication failed: {}", e).into_response(),
+    };
+
+    let mut identity = identity;
+    if let Some(rt) = _token.refresh_token {
+        identity.attributes.insert("refresh_token".to_string(), rt);
+    }
 
     let session = Session {
         id: uuid::Uuid::new_v4().to_string(),
@@ -112,7 +141,7 @@ async fn google_callback(
     
     cookies.add(cookie);
 
-    Redirect::to("/protected")
+    Redirect::to("/protected").into_response()
 }
 
 async fn protected(AuthSession(session): AuthSession) -> impl IntoResponse {
@@ -123,6 +152,27 @@ async fn protected(AuthSession(session): AuthSession) -> impl IntoResponse {
         session.identity.email,
         session.identity.attributes
     )
+}
+
+async fn refresh_handler(
+    State(state): State<AppState>,
+    AuthSession(session): AuthSession,
+) -> impl IntoResponse {
+    let refresh_token = match session.identity.attributes.get("refresh_token") {
+        Some(rt) => rt,
+        None => return "No refresh token found in session. Try logging in again.".into_response(),
+    };
+
+    match state.google_flow.refresh_access_token(refresh_token).await {
+        Ok(token) => Json(serde_json::json!({
+            "access_token": token.access_token,
+            "expires_in": token.expires_in,
+            "token_type": token.token_type,
+            "scope": token.scope,
+        }))
+        .into_response(),
+        Err(e) => format!("Failed to refresh token: {}", e).into_response(),
+    }
 }
 
 // Minimal MemoryStore for example

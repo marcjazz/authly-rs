@@ -73,9 +73,19 @@ async fn index() -> impl IntoResponse {
     "Welcome! Go to /auth/github to login."
 }
 
-async fn github_login(State(state): State<AppState>) -> impl IntoResponse {
-    let (url, _csrf_state) = state.github_flow.initiate_login();
-    // In real app, store _csrf_state in a secure cookie
+async fn github_login(
+    State(state): State<AppState>,
+    cookies: Cookies,
+) -> impl IntoResponse {
+    let (url, csrf_state) = state.github_flow.initiate_login();
+    
+    let mut cookie = Cookie::new("oauth_state", csrf_state);
+    cookie.set_path("/");
+    cookie.set_http_only(true);
+    cookie.set_same_site(SameSite::Lax);
+    
+    cookies.add(cookie);
+    
     Redirect::to(&url)
 }
 
@@ -90,11 +100,24 @@ async fn github_callback(
     cookies: Cookies,
     Query(params): Query<CallbackParams>,
 ) -> impl IntoResponse {
-    let identity = state
+    let expected_state = cookies
+        .get("oauth_state")
+        .map(|c| c.value().to_string())
+        .unwrap_or_default();
+
+    // Remove the state cookie after use
+    let mut remove_cookie = Cookie::new("oauth_state", "");
+    remove_cookie.set_path("/");
+    cookies.remove(remove_cookie);
+
+    let (identity, _token) = match state
         .github_flow
-        .finalize_login(&params.code, &params.state)
+        .finalize_login(&params.code, &params.state, &expected_state)
         .await
-        .unwrap();
+    {
+        Ok((identity, token)) => (identity, token),
+        Err(e) => return format!("Authentication failed: {}", e).into_response(),
+    };
 
     let session = Session {
         id: uuid::Uuid::new_v4().to_string(),
@@ -111,7 +134,7 @@ async fn github_callback(
     
     cookies.add(cookie);
 
-    Redirect::to("/protected")
+    Redirect::to("/protected").into_response()
 }
 
 async fn protected(AuthSession(session): AuthSession) -> impl IntoResponse {
