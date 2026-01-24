@@ -33,6 +33,3 @@ Ensure the reliability and correctness of the implemented features.
     *   The session management logic in [`authly-session`](authly-session/src/lib.rs).
     *   The overall authentication flow as implemented in the example application.
 *   **Goal:** Achieve high test coverage for the core authentication and session handling logic.
-
----
-**Status Update:** The `NEXT_STEPS.md` file has been created with the defined roadmap.

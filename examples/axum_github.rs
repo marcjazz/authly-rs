@@ -10,7 +10,7 @@ use axum::{
 };
 use std::collections::HashMap;
 use std::sync::Arc;
-use tower_cookies::{Cookie, Cookies, CookieManagerLayer};
+use tower_cookies::{cookie::SameSite, Cookie, Cookies, CookieManagerLayer};
 
 #[derive(Clone)]
 struct AppState {
@@ -27,13 +27,30 @@ impl axum::extract::FromRef<AppState> for Arc<dyn SessionStore> {
 
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().ok();
+
+    let client_id = std::env::var("AUTHLY_GITHUB_CLIENT_ID")
+        .expect("AUTHLY_GITHUB_CLIENT_ID must be set");
+    let client_secret = std::env::var("AUTHLY_GITHUB_CLIENT_SECRET")
+        .expect("AUTHLY_GITHUB_CLIENT_SECRET must be set");
+    let redirect_uri = std::env::var("AUTHLY_GITHUB_REDIRECT_URI")
+        .unwrap_or_else(|_| "http://localhost:3000/auth/github/callback".to_string());
+
     let provider = GithubProvider::new(
-        "CLIENT_ID".into(),
-        "CLIENT_SECRET".into(),
-        "http://localhost:3000/auth/github/callback".into(),
+        client_id,
+        client_secret,
+        redirect_uri,
     );
     let github_flow = Arc::new(OAuth2Flow::new(provider));
-    let session_store = Arc::new(MemoryStore::default());
+    
+    // Use Redis if REDIS_URL is set, otherwise fallback to MemoryStore
+    let session_store: Arc<dyn SessionStore> = if let Ok(redis_url) = std::env::var("REDIS_URL") {
+        println!("Using RedisStore at {}", redis_url);
+        Arc::new(authly_session::RedisStore::new(&redis_url, "authly".into()).unwrap())
+    } else {
+        println!("Using MemoryStore");
+        Arc::new(MemoryStore::default())
+    };
 
     let state = AppState {
         github_flow,
@@ -86,7 +103,13 @@ async fn github_callback(
     };
 
     state.session_store.save_session(&session).await.unwrap();
-    cookies.add(Cookie::new("authly_session", session.id));
+    
+    let mut cookie = Cookie::new("authly_session", session.id);
+    cookie.set_path("/");
+    cookie.set_http_only(true);
+    cookie.set_same_site(SameSite::Lax);
+    
+    cookies.add(cookie);
 
     Redirect::to("/protected")
 }
