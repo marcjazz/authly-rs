@@ -18,8 +18,8 @@ Add more OAuth providers to make the library more versatile.
 - [x] **Discord:** Implement `authly-providers-discord`.
 
 ## 4. Enhanced Security & Features
-- [ ] CSRF Protection: Ensure the `state` parameter in OAuth is cryptographically secure and validated.
-- [ ] Token Rotation: Implement refresh tokens if the provider supports it.
+- [x] CSRF Protection: Ensure the `state` parameter in OAuth is cryptographically secure and validated.
+- [x] Token Rotation: Implement refresh tokens if the provider supports it.
 - [ ] User Mapping: Allow mapping provider identities to a local user database (e.g., using an ORM like `sqlx` or `diesel`).
 
 ## 5. Documentation
