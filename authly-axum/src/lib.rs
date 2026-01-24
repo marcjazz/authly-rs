@@ -113,13 +113,14 @@ where
 /// Helper to initiate the OAuth2 login flow.
 ///
 /// This generates the authorization URL and sets a CSRF state cookie.
-pub fn initiate_oauth_login<P>(
-    flow: &OAuth2Flow<P>,
+pub fn initiate_oauth_login<P, M>(
+    flow: &OAuth2Flow<P, M>,
     cookies: &Cookies,
     scopes: &[&str],
 ) -> Redirect
 where
     P: OAuthProvider,
+    M: authly_core::UserMapper,
 {
     let (url, csrf_state) = flow.initiate_login(scopes);
 
@@ -134,8 +135,8 @@ where
 }
 
 /// Helper to handle the OAuth2 callback boilerplate.
-pub async fn handle_oauth_callback<P>(
-    flow: &OAuth2Flow<P>,
+pub async fn handle_oauth_callback<P, M>(
+    flow: &OAuth2Flow<P, M>,
     cookies: Cookies,
     params: OAuthCallbackParams,
     store: Arc<dyn SessionStore>,
@@ -144,6 +145,7 @@ pub async fn handle_oauth_callback<P>(
 ) -> Result<impl IntoResponse, (StatusCode, String)>
 where
     P: OAuthProvider + Send + Sync,
+    M: authly_core::UserMapper + Send + Sync,
 {
     let expected_state = cookies
         .get("oauth_state")
@@ -155,7 +157,7 @@ where
     remove_cookie.set_path("/");
     cookies.remove(remove_cookie);
 
-    let (mut identity, token) = flow
+    let (mut identity, token, _local_user) = flow
         .finalize_login(&params.code, &params.state, &expected_state)
         .await
         .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Authentication failed: {}", e)))?;
