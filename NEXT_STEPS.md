@@ -7,12 +7,10 @@ This roadmap outlines the steps to reach a production-ready state.
 - [x] Implement Redis persistence in `authly-session`.
 - [x] Add unit tests for providers and session store.
 
-## 2. Run and Verify Example
-The example application `examples/axum_github.rs` is ready to run.
-
-*   **Action:** Configure environment variables in `.env` (use `.env.example` as a template).
-*   **Run:** `cargo run --example axum_github`
-*   **Verify:** Log in with GitHub and check if the session cookie is set and persisted in Redis (if enabled) or memory.
+## 2. Run and Verify Example (Done)
+- [x] Configure environment variables in `.env`.
+- [x] Run the example application: `cargo run --example axum_github`.
+- [x] Verify GitHub login and session persistence.
 
 ## 3. Expand Provider Support
 Add more OAuth providers to make the library more versatile.
