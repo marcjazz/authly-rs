@@ -8,3 +8,8 @@ authly-core = { path = "../authly-core" }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
 serde = { version = "1.0", features = ["derive"] }
+redis = { version = "0.25", features = ["tokio-comp"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }
