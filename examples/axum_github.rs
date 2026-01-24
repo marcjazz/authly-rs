@@ -1,4 +1,4 @@
-use authly_axum::{handle_oauth_callback_jwt, initiate_oauth_login, AuthToken, OAuthCallbackParams};
+use authly_axum::{handle_oauth_callback_jwt, initiate_oauth_login, logout, AuthToken, OAuthCallbackParams, SessionConfig};
 use authly_flow::OAuth2Flow;
 use authly_providers_github::GithubProvider;
 use authly_token::TokenManager;
@@ -8,6 +8,7 @@ use axum::{
     routing::get,
     Router,
 };
+use authly_session::SessionStore;
 use std::sync::Arc;
 use tower_cookies::{Cookies, CookieManagerLayer};
 
@@ -15,6 +16,7 @@ use tower_cookies::{Cookies, CookieManagerLayer};
 struct AppState {
     github_flow: Arc<OAuth2Flow<GithubProvider>>,
     token_manager: Arc<TokenManager>,
+    session_store: Arc<dyn SessionStore>,
 }
 
 impl FromRef<AppState> for Arc<TokenManager> {
@@ -43,16 +45,21 @@ async fn main() {
     );
     let github_flow = Arc::new(OAuth2Flow::new(provider));
     let token_manager = Arc::new(TokenManager::new(jwt_secret.as_bytes()));
+    // For this example, we'll use a simple memory store for sessions if needed,
+    // although this example primarily uses JWT.
+    let session_store: Arc<dyn SessionStore> = Arc::new(authly_session::MemoryStore::new());
 
     let state = AppState {
         github_flow,
         token_manager,
+        session_store,
     };
 
     let app = Router::new()
         .route("/", get(index))
         .route("/auth/github", get(github_login))
         .route("/auth/github/callback", get(github_callback))
+        .route("/auth/logout", get(github_logout))
         .route("/protected", get(protected))
         .layer(CookieManagerLayer::new())
         .with_state(state);
@@ -86,6 +93,13 @@ async fn github_callback(
         3600,
     )
     .await
+}
+
+async fn github_logout(
+    State(state): State<AppState>,
+    cookies: Cookies,
+) -> impl IntoResponse {
+    logout(cookies, state.session_store, SessionConfig::default(), "/").await
 }
 
 async fn protected(AuthToken(identity): AuthToken) -> impl IntoResponse {
