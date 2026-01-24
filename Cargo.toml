@@ -7,5 +7,6 @@ members = [
     "authly-token",
     "authly-providers-github",
     "authly-providers-google",
+    "authly-providers-discord",
     "authly-axum",
 ]
