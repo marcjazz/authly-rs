@@ -14,14 +14,14 @@ This roadmap outlines the steps to reach a production-ready state.
 
 ## 3. Expand Provider Support
 Add more OAuth providers to make the library more versatile.
-*   **Google:** Implement `authly-providers-google`.
-*   **Discord:** Implement `authly-providers-discord`.
+- [x] **Google:** Implement `authly-providers-google`.
+- [ ] **Discord:** Implement `authly-providers-discord`.
 
 ## 4. Enhanced Security & Features
-*   **CSRF Protection:** Ensure the `state` parameter in OAuth is cryptographically secure and validated.
-*   **Token Rotation:** Implement refresh tokens if the provider supports it.
-*   **User Mapping:** Allow mapping provider identities to a local user database (e.g., using an ORM like `sqlx` or `diesel`).
+- [ ] CSRF Protection: Ensure the `state` parameter in OAuth is cryptographically secure and validated.
+- [ ] Token Rotation: Implement refresh tokens if the provider supports it.
+- [ ] User Mapping: Allow mapping provider identities to a local user database (e.g., using an ORM like `sqlx` or `diesel`).
 
 ## 5. Documentation
-*   Add `README.md` for each crate.
-*   Add API documentation (Rustdoc) for public traits and structs.
+- [ ] Add `README.md` for each crate.
+- [ ] Add API documentation (Rustdoc) for public traits and structs.
