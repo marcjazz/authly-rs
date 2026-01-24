@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use authly_core::{AuthError, Identity, OAuthProvider};
+use authly_core::{AuthError, Identity, OAuthProvider, OAuthToken};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -38,6 +38,10 @@ impl GoogleProvider {
 #[derive(Deserialize)]
 struct GoogleTokenResponse {
     access_token: String,
+    token_type: String,
+    expires_in: Option<u64>,
+    refresh_token: Option<String>,
+    scope: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -60,12 +64,12 @@ impl OAuthProvider for GoogleProvider {
         };
 
         format!(
-            "{}?client_id={}&redirect_uri={}&state={}&scope={}&response_type=code",
+            "{}?client_id={}&redirect_uri={}&state={}&scope={}&response_type=code&access_type=offline&prompt=consent",
             self.auth_url, self.client_id, self.redirect_uri, state, scope_param
         )
     }
 
-    async fn exchange_code_for_identity(&self, code: &str) -> Result<Identity, AuthError> {
+    async fn exchange_code_for_identity(&self, code: &str) -> Result<(Identity, OAuthToken), AuthError> {
         // 1. Exchange code for access token
         let token_response = self.http_client
             .post(&self.token_url)
@@ -106,12 +110,47 @@ impl OAuthProvider for GoogleProvider {
             attributes.insert("locale".to_string(), locale);
         }
 
-        Ok(Identity {
+        let identity = Identity {
             provider_id: "google".to_string(),
             external_id: user_response.sub,
             email: user_response.email,
             username: user_response.name,
             attributes,
+        };
+
+        let token = OAuthToken {
+            access_token: token_response.access_token,
+            token_type: token_response.token_type,
+            expires_in: token_response.expires_in,
+            refresh_token: token_response.refresh_token,
+            scope: token_response.scope,
+        };
+
+        Ok((identity, token))
+    }
+
+    async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, AuthError> {
+        let token_response = self.http_client
+            .post(&self.token_url)
+            .form(&[
+                ("refresh_token", refresh_token),
+                ("client_id", &self.client_id),
+                ("client_secret", &self.client_secret),
+                ("grant_type", "refresh_token"),
+            ])
+            .send()
+            .await
+            .map_err(|_| AuthError::Network)?
+            .json::<GoogleTokenResponse>()
+            .await
+            .map_err(|e| AuthError::Provider(format!("Failed to parse refresh token response: {}", e)))?;
+
+        Ok(OAuthToken {
+            access_token: token_response.access_token,
+            token_type: token_response.token_type,
+            expires_in: token_response.expires_in,
+            refresh_token: token_response.refresh_token.or_else(|| Some(refresh_token.to_string())),
+            scope: token_response.scope,
         })
     }
 }
@@ -131,7 +170,7 @@ mod tests {
         let _token_mock = server.mock("POST", "/token")
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{"access_token": "test_token"}"#)
+            .with_body(r#"{"access_token": "test_token", "token_type": "Bearer", "expires_in": 3600, "refresh_token": "test_refresh_token"}"#)
             .create_async()
             .await;
 
@@ -155,7 +194,7 @@ mod tests {
             "http://localhost/callback".to_string(),
         ).with_test_urls(auth_url, token_url, userinfo_url);
 
-        let identity = provider.exchange_code_for_identity("test_code").await.unwrap();
+        let (identity, token) = provider.exchange_code_for_identity("test_code").await.unwrap();
 
         assert_eq!(identity.provider_id, "google");
         assert_eq!(identity.external_id, "google-123");
@@ -164,5 +203,7 @@ mod tests {
         assert_eq!(identity.attributes.get("picture").unwrap(), "http://picture");
         assert_eq!(identity.attributes.get("email_verified").unwrap(), "true");
         assert_eq!(identity.attributes.get("locale").unwrap(), "en");
+        assert_eq!(token.access_token, "test_token");
+        assert_eq!(token.refresh_token, Some("test_refresh_token".to_string()));
     }
 }

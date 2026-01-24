@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use authly_core::{AuthError, Identity, OAuthProvider};
+use authly_core::{AuthError, Identity, OAuthProvider, OAuthToken};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -35,6 +35,15 @@ impl GithubProvider {
 #[derive(Deserialize)]
 struct GithubAccessTokenResponse {
     access_token: String,
+    #[serde(default = "default_token_type")]
+    token_type: String,
+    expires_in: Option<u64>,
+    refresh_token: Option<String>,
+    scope: Option<String>,
+}
+
+fn default_token_type() -> String {
+    "Bearer".to_string()
 }
 
 #[derive(Deserialize)]
@@ -59,7 +68,7 @@ impl OAuthProvider for GithubProvider {
         )
     }
 
-    async fn exchange_code_for_identity(&self, code: &str) -> Result<Identity, AuthError> {
+    async fn exchange_code_for_identity(&self, code: &str) -> Result<(Identity, OAuthToken), AuthError> {
         // 1. Exchange code for access token
         let token_response = self.http_client
             .post(&self.token_url)
@@ -90,12 +99,48 @@ impl OAuthProvider for GithubProvider {
             .map_err(|e| AuthError::Provider(format!("Failed to parse user response: {}", e)))?;
 
         // 3. Map to Identity
-        Ok(Identity {
+        let identity = Identity {
             provider_id: "github".to_string(),
             external_id: user_response.id.to_string(),
             email: user_response.email,
             username: Some(user_response.login),
             attributes: HashMap::new(),
+        };
+
+        let token = OAuthToken {
+            access_token: token_response.access_token,
+            token_type: token_response.token_type,
+            expires_in: token_response.expires_in,
+            refresh_token: token_response.refresh_token,
+            scope: token_response.scope,
+        };
+
+        Ok((identity, token))
+    }
+
+    async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, AuthError> {
+        let token_response = self.http_client
+            .post(&self.token_url)
+            .header("Accept", "application/json")
+            .form(&[
+                ("client_id", &self.client_id),
+                ("client_secret", &self.client_secret),
+                ("grant_type", &"refresh_token".to_string()),
+                ("refresh_token", &refresh_token.to_string()),
+            ])
+            .send()
+            .await
+            .map_err(|_| AuthError::Network)?
+            .json::<GithubAccessTokenResponse>()
+            .await
+            .map_err(|e| AuthError::Provider(format!("Failed to parse refresh token response: {}", e)))?;
+
+        Ok(OAuthToken {
+            access_token: token_response.access_token,
+            token_type: token_response.token_type,
+            expires_in: token_response.expires_in,
+            refresh_token: token_response.refresh_token.or_else(|| Some(refresh_token.to_string())),
+            scope: token_response.scope,
         })
     }
 }
@@ -114,7 +159,7 @@ mod tests {
         let _token_mock = server.mock("POST", "/login/oauth/access_token")
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{"access_token": "test_token"}"#)
+            .with_body(r#"{"access_token": "test_token", "token_type": "bearer"}"#)
             .create_async()
             .await;
 
@@ -131,11 +176,12 @@ mod tests {
             "http://localhost/callback".to_string(),
         ).with_test_urls(token_url, user_url);
 
-        let identity = provider.exchange_code_for_identity("test_code").await.unwrap();
+        let (identity, token) = provider.exchange_code_for_identity("test_code").await.unwrap();
 
         assert_eq!(identity.provider_id, "github");
         assert_eq!(identity.external_id, "123");
         assert_eq!(identity.username, Some("testuser".to_string()));
         assert_eq!(identity.email, Some("test@example.com".to_string()));
+        assert_eq!(token.access_token, "test_token");
     }
 }
