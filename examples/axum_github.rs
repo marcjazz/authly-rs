@@ -1,16 +1,16 @@
-use authly_axum::{handle_oauth_callback, AuthSession, OAuthCallbackParams, SessionConfig};
+use authly_axum::{handle_oauth_callback, initiate_oauth_login, AuthSession, OAuthCallbackParams, SessionConfig};
 use authly_flow::OAuth2Flow;
 use authly_providers_github::GithubProvider;
 use authly_session::{Session, SessionStore};
 use axum::{
     extract::{Query, State},
-    response::{IntoResponse, Redirect},
+    response::IntoResponse,
     routing::get,
     Router,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
-use tower_cookies::{cookie::SameSite, Cookie, Cookies, CookieManagerLayer};
+use tower_cookies::{Cookies, CookieManagerLayer};
 
 #[derive(Clone)]
 struct AppState {
@@ -85,16 +85,7 @@ async fn github_login(
     State(state): State<AppState>,
     cookies: Cookies,
 ) -> impl IntoResponse {
-    let (url, csrf_state) = state.github_flow.initiate_login(&["user:email"]);
-    
-    let mut cookie = Cookie::new("oauth_state", csrf_state);
-    cookie.set_path("/");
-    cookie.set_http_only(true);
-    cookie.set_same_site(SameSite::Lax);
-    
-    cookies.add(cookie);
-    
-    Redirect::to(&url)
+    initiate_oauth_login(&state.github_flow, &cookies, &["user:email"])
 }
 
 async fn github_callback(

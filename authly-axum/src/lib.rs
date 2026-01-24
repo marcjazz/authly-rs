@@ -110,6 +110,29 @@ where
     }
 }
 
+/// Helper to initiate the OAuth2 login flow.
+///
+/// This generates the authorization URL and sets a CSRF state cookie.
+pub fn initiate_oauth_login<P>(
+    flow: &OAuth2Flow<P>,
+    cookies: &Cookies,
+    scopes: &[&str],
+) -> Redirect
+where
+    P: OAuthProvider,
+{
+    let (url, csrf_state) = flow.initiate_login(scopes);
+
+    let mut cookie = Cookie::new("oauth_state", csrf_state);
+    cookie.set_path("/");
+    cookie.set_http_only(true);
+    cookie.set_same_site(SameSite::Lax);
+
+    cookies.add(cookie);
+
+    Redirect::to(&url)
+}
+
 /// Helper to handle the OAuth2 callback boilerplate.
 pub async fn handle_oauth_callback<P>(
     flow: &OAuth2Flow<P>,
