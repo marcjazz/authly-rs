@@ -70,7 +70,7 @@ where
 /// The extractor for a validated JWT.
 ///
 /// Expects an `Authorization: Bearer <token>` header.
-pub struct AuthToken(pub authly_core::Identity);
+pub struct AuthToken(pub authly_token::Claims);
 
 #[async_trait]
 impl<S> FromRequestParts<S> for AuthToken
@@ -94,10 +94,10 @@ where
         }
 
         let token = &auth_header[7..];
-        let identity = token_manager
+        let claims = token_manager
             .validate_token(token)
             .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Invalid token: {}", e)))?;
 
-        Ok(AuthToken(identity))
+        Ok(AuthToken(claims))
     }
 }

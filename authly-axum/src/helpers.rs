@@ -195,7 +195,7 @@ where
     let (identity, _token) = finalize_callback(flow, &cookies, &params).await?;
 
     let jwt = token_manager
-        .issue_token(identity, expires_in_secs)
+        .issue_user_token(identity, expires_in_secs, None)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Token error: {}", e)))?;
 
     Ok(Json(serde_json::json!({
