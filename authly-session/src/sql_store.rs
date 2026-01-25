@@ -16,8 +16,8 @@ pub type SqlStore<DB> = SqlSessionStore<DB>;
 #[derive(sqlx::FromRow)]
 pub struct SqlSessionModel {
     pub id: String,
-    pub provider_name: String,
     pub provider_id: String,
+    pub external_id: String,
     pub email: Option<String>,
     pub name: Option<String>,
     pub claims: String,
@@ -42,7 +42,7 @@ impl<DB: Database> SqlSessionStore<DB> {
 impl SessionStore for SqlSessionStore<sqlx::Postgres> {
     async fn load_session(&self, id: &str) -> Result<Option<Session>, AuthError> {
         let query = format!(
-            "SELECT id, provider_name, provider_id, email, name, claims, expires_at FROM {} WHERE id = $1 AND expires_at > $2",
+            "SELECT id, provider_id, external_id, email, name, claims, expires_at FROM {} WHERE id = $1 AND expires_at > $2",
             self.table_name
         );
         let now = chrono::Utc::now();
@@ -62,8 +62,8 @@ impl SessionStore for SqlSessionStore<sqlx::Postgres> {
                 let session = Session {
                     id: model.id,
                     identity: Identity {
-                        provider_id: model.provider_name,
-                        external_id: model.provider_id,
+                        provider_id: model.provider_id,
+                        external_id: model.external_id,
                         email: model.email,
                         username: model.name,
                         attributes: claims,
@@ -78,10 +78,10 @@ impl SessionStore for SqlSessionStore<sqlx::Postgres> {
 
     async fn save_session(&self, session: &Session) -> Result<(), AuthError> {
         let query = format!(
-            "INSERT INTO {} (id, provider_name, provider_id, email, name, claims, expires_at)
+            "INSERT INTO {} (id, provider_id, external_id, email, name, claims, expires_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7)
              ON CONFLICT(id) DO UPDATE SET
-             provider_name = $2, provider_id = $3, email = $4, name = $5, claims = $6, expires_at = $7",
+             provider_id = $2, external_id = $3, email = $4, name = $5, claims = $6, expires_at = $7",
             self.table_name
         );
         let claims_json = serde_json::to_string(&session.identity.attributes)
@@ -118,7 +118,7 @@ impl SessionStore for SqlSessionStore<sqlx::Postgres> {
 impl SessionStore for SqlSessionStore<sqlx::Sqlite> {
     async fn load_session(&self, id: &str) -> Result<Option<Session>, AuthError> {
         let query = format!(
-            "SELECT id, provider_name, provider_id, email, name, claims, expires_at FROM {} WHERE id = ?1 AND expires_at > ?2",
+            "SELECT id, provider_id, external_id, email, name, claims, expires_at FROM {} WHERE id = ?1 AND expires_at > ?2",
             self.table_name
         );
         let now = chrono::Utc::now();
@@ -138,8 +138,8 @@ impl SessionStore for SqlSessionStore<sqlx::Sqlite> {
                 let session = Session {
                     id: model.id,
                     identity: Identity {
-                        provider_id: model.provider_name,
-                        external_id: model.provider_id,
+                        provider_id: model.provider_id,
+                        external_id: model.external_id,
                         email: model.email,
                         username: model.name,
                         attributes: claims,
@@ -154,10 +154,10 @@ impl SessionStore for SqlSessionStore<sqlx::Sqlite> {
 
     async fn save_session(&self, session: &Session) -> Result<(), AuthError> {
         let query = format!(
-            "INSERT INTO {} (id, provider_name, provider_id, email, name, claims, expires_at)
+            "INSERT INTO {} (id, provider_id, external_id, email, name, claims, expires_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              ON CONFLICT(id) DO UPDATE SET
-             provider_name = ?2, provider_id = ?3, email = ?4, name = ?5, claims = ?6, expires_at = ?7",
+             provider_id = ?2, external_id = ?3, email = ?4, name = ?5, claims = ?6, expires_at = ?7",
             self.table_name
         );
         let claims_json = serde_json::to_string(&session.identity.attributes)
@@ -194,7 +194,7 @@ impl SessionStore for SqlSessionStore<sqlx::Sqlite> {
 impl SessionStore for SqlSessionStore<sqlx::MySql> {
     async fn load_session(&self, id: &str) -> Result<Option<Session>, AuthError> {
         let query = format!(
-            "SELECT id, provider_name, provider_id, email, name, claims, expires_at FROM {} WHERE id = ? AND expires_at > ?",
+            "SELECT id, provider_id, external_id, email, name, claims, expires_at FROM {} WHERE id = ? AND expires_at > ?",
             self.table_name
         );
         let now = chrono::Utc::now();
@@ -214,8 +214,8 @@ impl SessionStore for SqlSessionStore<sqlx::MySql> {
                 let session = Session {
                     id: model.id,
                     identity: Identity {
-                        provider_id: model.provider_name,
-                        external_id: model.provider_id,
+                        provider_id: model.provider_id,
+                        external_id: model.external_id,
                         email: model.email,
                         username: model.name,
                         attributes: claims,
@@ -230,11 +230,11 @@ impl SessionStore for SqlSessionStore<sqlx::MySql> {
 
     async fn save_session(&self, session: &Session) -> Result<(), AuthError> {
         let query = format!(
-            "INSERT INTO {} (id, provider_name, provider_id, email, name, claims, expires_at)
+            "INSERT INTO {} (id, provider_id, external_id, email, name, claims, expires_at)
              VALUES (?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
-             provider_name = VALUES(provider_name),
              provider_id = VALUES(provider_id),
+             external_id = VALUES(external_id),
              email = VALUES(email),
              name = VALUES(name),
              claims = VALUES(claims),
