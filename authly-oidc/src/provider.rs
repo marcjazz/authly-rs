@@ -130,7 +130,7 @@ impl OAuthProvider for OidcProvider {
         // 2. Fetch JWKS
         let jwks = Jwks::fetch(&self.metadata.jwks_uri, &self.http_client)
             .await
-            .map_err(|e| AuthError::from(e))?;
+            .map_err(AuthError::from)?;
 
         // 3. Decode and Validate ID Token
         let header = decode_header(&id_token)
@@ -140,11 +140,11 @@ impl OAuthProvider for OidcProvider {
             .find_key(header.kid.as_deref())
             .ok_or_else(|| AuthError::Token("No matching key found in JWKS".to_string()))?;
 
-        let decoding_key = jwk.to_decoding_key().map_err(|e| AuthError::from(e))?;
+        let decoding_key = jwk.to_decoding_key().map_err(AuthError::from)?;
 
         let mut validation = Validation::new(Algorithm::RS256);
-        validation.set_issuer(&[self.metadata.issuer.clone()]);
-        validation.set_audience(&[self.client_id.clone()]);
+        validation.set_issuer(std::slice::from_ref(&self.metadata.issuer));
+        validation.set_audience(std::slice::from_ref(&self.client_id));
 
         let token_data = decode::<Claims>(&id_token, &decoding_key, &validation)
             .map_err(|e| AuthError::Token(format!("ID Token validation failed: {}", e)))?;
