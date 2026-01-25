@@ -36,11 +36,11 @@ Add more OAuth providers to make the library more versatile.
 - [ ] **Actix-web Support:** Implement a sister crate for `authly-axum` to support the Actix ecosystem.
 
 ## 8. Protocol Completeness
-- [ ] **OIDC (OpenID Connect):** Implement ID Token validation and discovery document support.
+- [x] **OIDC (OpenID Connect):** Implement ID Token validation and discovery document support.
 - [x] **Logout Flow:** Add standardized session invalidation and cookie clearing helpers.
 
 ## 9. Reliability & Distribution
-- [ ] **CI/CD:** Set up GitHub Actions for automated testing across different Rust versions.
+- [x] **CI/CD:** Set up GitHub Actions for automated testing across different Rust versions.
 - [ ] **Integration Testing:** Add comprehensive integration tests with Mock servers for OAuth providers.
 - [ ] **Crates.io Readiness:** Finalize metadata, licenses, and documentation for initial publishing.
 
