@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use crate::error::OidcError;
+use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProviderMetadata {
@@ -18,14 +18,17 @@ impl ProviderMetadata {
     pub async fn discover(issuer_url: &str, client: &reqwest::Client) -> Result<Self, OidcError> {
         let mut url = url::Url::parse(issuer_url)
             .map_err(|e| OidcError::Discovery(format!("Invalid issuer URL: {}", e)))?;
-        
+
         {
-            let mut path = url.path_segments_mut().map_err(|_| OidcError::Discovery("Cannot append to issuer URL".to_string()))?;
+            let mut path = url
+                .path_segments_mut()
+                .map_err(|_| OidcError::Discovery("Cannot append to issuer URL".to_string()))?;
             path.push(".well-known");
             path.push("openid-configuration");
         }
 
-        let metadata = client.get(url)
+        let metadata = client
+            .get(url)
             .send()
             .await
             .map_err(|e| OidcError::Network(e.to_string()))?

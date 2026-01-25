@@ -1,4 +1,6 @@
-use authly_core::{OAuthProvider, Identity, AuthError, CredentialsProvider, OAuthToken, UserMapper};
+use authly_core::{
+    AuthError, CredentialsProvider, Identity, OAuthProvider, OAuthToken, UserMapper,
+};
 
 /// Orchestrates the Authorization Code flow.
 pub struct OAuth2Flow<P: OAuthProvider, M: UserMapper = ()> {
@@ -8,30 +10,51 @@ pub struct OAuth2Flow<P: OAuthProvider, M: UserMapper = ()> {
 
 impl<P: OAuthProvider> OAuth2Flow<P, ()> {
     pub fn new(provider: P) -> Self {
-        Self { provider, mapper: None }
+        Self {
+            provider,
+            mapper: None,
+        }
     }
 }
 
 impl<P: OAuthProvider, M: UserMapper> OAuth2Flow<P, M> {
     pub fn with_mapper(provider: P, mapper: M) -> Self {
-        Self { provider, mapper: Some(mapper) }
+        Self {
+            provider,
+            mapper: Some(mapper),
+        }
     }
 
     /// Generates the redirect URL and CSRF state.
-    pub fn initiate_login(&self, scopes: &[&str], pkce_challenge: Option<&str>) -> (String, String) {
+    pub fn initiate_login(
+        &self,
+        scopes: &[&str],
+        pkce_challenge: Option<&str>,
+    ) -> (String, String) {
         let state = uuid::Uuid::new_v4().to_string();
-        let url = self.provider.get_authorization_url(&state, scopes, pkce_challenge);
+        let url = self
+            .provider
+            .get_authorization_url(&state, scopes, pkce_challenge);
         (url, state)
     }
 
     /// Completes the flow by exchanging the code.
     /// If a mapper is provided, it will also map the identity to a local user.
-    pub async fn finalize_login(&self, code: &str, received_state: &str, expected_state: &str, pkce_verifier: Option<&str>) -> Result<(Identity, OAuthToken, Option<M::LocalUser>), AuthError> {
+    pub async fn finalize_login(
+        &self,
+        code: &str,
+        received_state: &str,
+        expected_state: &str,
+        pkce_verifier: Option<&str>,
+    ) -> Result<(Identity, OAuthToken, Option<M::LocalUser>), AuthError> {
         if received_state != expected_state {
             return Err(AuthError::CsrfMismatch);
         }
-        let (identity, token) = self.provider.exchange_code_for_identity(code, pkce_verifier).await?;
-        
+        let (identity, token) = self
+            .provider
+            .exchange_code_for_identity(code, pkce_verifier)
+            .await?;
+
         let local_user = if let Some(mapper) = &self.mapper {
             Some(mapper.map_user(&identity).await?)
         } else {
@@ -60,18 +83,27 @@ pub struct CredentialsFlow<P: CredentialsProvider, M: UserMapper = ()> {
 
 impl<P: CredentialsProvider> CredentialsFlow<P, ()> {
     pub fn new(provider: P) -> Self {
-        Self { provider, mapper: None }
+        Self {
+            provider,
+            mapper: None,
+        }
     }
 }
 
 impl<P: CredentialsProvider, M: UserMapper> CredentialsFlow<P, M> {
     pub fn with_mapper(provider: P, mapper: M) -> Self {
-        Self { provider, mapper: Some(mapper) }
+        Self {
+            provider,
+            mapper: Some(mapper),
+        }
     }
 
-    pub async fn authenticate(&self, creds: P::Credentials) -> Result<(Identity, Option<M::LocalUser>), AuthError> {
+    pub async fn authenticate(
+        &self,
+        creds: P::Credentials,
+    ) -> Result<(Identity, Option<M::LocalUser>), AuthError> {
         let identity = self.provider.authenticate(creds).await?;
-        
+
         let local_user = if let Some(mapper) = &self.mapper {
             Some(mapper.map_user(&identity).await?)
         } else {
@@ -81,4 +113,3 @@ impl<P: CredentialsProvider, M: UserMapper> CredentialsFlow<P, M> {
         Ok((identity, local_user))
     }
 }
-

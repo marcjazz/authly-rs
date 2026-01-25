@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use authly_core::{Identity, AuthError};
+use authly_core::{AuthError, Identity};
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashMap;
@@ -11,13 +11,11 @@ pub mod sql_store;
 #[cfg(feature = "store-sqlx")]
 pub use sql_store::{SqlSessionStore, SqlStore};
 
-
 #[cfg(feature = "store-redis")]
 pub mod redis_store;
 
 #[cfg(feature = "store-redis")]
 pub use redis_store::RedisStore;
-
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Session {
@@ -50,7 +48,10 @@ impl SessionStore for MemoryStore {
         Ok(self.sessions.lock().unwrap().get(id).cloned())
     }
     async fn save_session(&self, session: &Session) -> Result<(), AuthError> {
-        self.sessions.lock().unwrap().insert(session.id.clone(), session.clone());
+        self.sessions
+            .lock()
+            .unwrap()
+            .insert(session.id.clone(), session.clone());
         Ok(())
     }
     async fn delete_session(&self, id: &str) -> Result<(), AuthError> {

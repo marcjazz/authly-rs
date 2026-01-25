@@ -1,6 +1,6 @@
-use serde::Deserialize;
 use crate::error::OidcError;
 use jsonwebtoken::DecodingKey;
+use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Jwks {
@@ -18,7 +18,8 @@ pub struct Jwk {
 
 impl Jwks {
     pub async fn fetch(jwks_uri: &str, client: &reqwest::Client) -> Result<Self, OidcError> {
-        client.get(jwks_uri)
+        client
+            .get(jwks_uri)
             .send()
             .await
             .map_err(|e| OidcError::Network(e.to_string()))?
@@ -38,11 +39,17 @@ impl Jwks {
 impl Jwk {
     pub fn to_decoding_key(&self) -> Result<DecodingKey, OidcError> {
         if self.kty != "RSA" {
-            return Err(OidcError::ValidationError("Only RSA keys are supported currently".to_string()));
+            return Err(OidcError::ValidationError(
+                "Only RSA keys are supported currently".to_string(),
+            ));
         }
 
-        let n = self.n.as_ref().ok_or_else(|| OidcError::ValidationError("Missing 'n' component in JWK".to_string()))?;
-        let e = self.e.as_ref().ok_or_else(|| OidcError::ValidationError("Missing 'e' component in JWK".to_string()))?;
+        let n = self.n.as_ref().ok_or_else(|| {
+            OidcError::ValidationError("Missing 'n' component in JWK".to_string())
+        })?;
+        let e = self.e.as_ref().ok_or_else(|| {
+            OidcError::ValidationError("Missing 'e' component in JWK".to_string())
+        })?;
 
         DecodingKey::from_rsa_components(n, e)
             .map_err(|e| OidcError::ValidationError(format!("Invalid RSA components: {}", e)))

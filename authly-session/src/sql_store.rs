@@ -1,6 +1,6 @@
-use authly_core::{AuthError, Identity};
 use crate::{Session, SessionStore};
 use async_trait::async_trait;
+use authly_core::{AuthError, Identity};
 use sqlx::Database;
 use std::collections::HashMap;
 
@@ -46,7 +46,7 @@ impl SessionStore for SqlSessionStore<sqlx::Postgres> {
             self.table_name
         );
         let now = chrono::Utc::now();
-        
+
         let row: Option<SqlSessionModel> = sqlx::query_as(&query)
             .bind(id)
             .bind(now)
@@ -56,9 +56,11 @@ impl SessionStore for SqlSessionStore<sqlx::Postgres> {
 
         match row {
             Some(model) => {
-                let claims: HashMap<String, String> = serde_json::from_str(&model.claims)
-                    .map_err(|e| AuthError::Session(format!("Claims deserialization error: {}", e)))?;
-                
+                let claims: HashMap<String, String> =
+                    serde_json::from_str(&model.claims).map_err(|e| {
+                        AuthError::Session(format!("Claims deserialization error: {}", e))
+                    })?;
+
                 let session = Session {
                     id: model.id,
                     identity: Identity {
@@ -122,7 +124,7 @@ impl SessionStore for SqlSessionStore<sqlx::Sqlite> {
             self.table_name
         );
         let now = chrono::Utc::now();
-        
+
         let row: Option<SqlSessionModel> = sqlx::query_as(&query)
             .bind(id)
             .bind(now)
@@ -132,9 +134,11 @@ impl SessionStore for SqlSessionStore<sqlx::Sqlite> {
 
         match row {
             Some(model) => {
-                let claims: HashMap<String, String> = serde_json::from_str(&model.claims)
-                    .map_err(|e| AuthError::Session(format!("Claims deserialization error: {}", e)))?;
-                
+                let claims: HashMap<String, String> =
+                    serde_json::from_str(&model.claims).map_err(|e| {
+                        AuthError::Session(format!("Claims deserialization error: {}", e))
+                    })?;
+
                 let session = Session {
                     id: model.id,
                     identity: Identity {
@@ -198,7 +202,7 @@ impl SessionStore for SqlSessionStore<sqlx::MySql> {
             self.table_name
         );
         let now = chrono::Utc::now();
-        
+
         let row: Option<SqlSessionModel> = sqlx::query_as(&query)
             .bind(id)
             .bind(now)
@@ -208,9 +212,11 @@ impl SessionStore for SqlSessionStore<sqlx::MySql> {
 
         match row {
             Some(model) => {
-                let claims: HashMap<String, String> = serde_json::from_str(&model.claims)
-                    .map_err(|e| AuthError::Session(format!("Claims deserialization error: {}", e)))?;
-                
+                let claims: HashMap<String, String> =
+                    serde_json::from_str(&model.claims).map_err(|e| {
+                        AuthError::Session(format!("Claims deserialization error: {}", e))
+                    })?;
+
                 let session = Session {
                     id: model.id,
                     identity: Identity {

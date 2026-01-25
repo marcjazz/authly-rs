@@ -39,12 +39,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let issuer = std::env::var("OIDC_ISSUER").expect("OIDC_ISSUER must be set");
     let client_id = std::env::var("OIDC_CLIENT_ID").expect("OIDC_CLIENT_ID must be set");
-    let client_secret = std::env::var("OIDC_CLIENT_SECRET").expect("OIDC_CLIENT_SECRET must be set");
+    let client_secret =
+        std::env::var("OIDC_CLIENT_SECRET").expect("OIDC_CLIENT_SECRET must be set");
     let redirect_uri = std::env::var("OIDC_REDIRECT_URI")
         .unwrap_or_else(|_| "http://localhost:3000/auth/oidc/callback".to_string());
 
     println!("Initializing OIDC provider with issuer: {}", issuer);
-    
+
     // Demonstrate initialization/discovery
     let provider = OidcProvider::discover(client_id, client_secret, redirect_uri, &issuer).await?;
     let oidc_flow = Arc::new(OAuth2Flow::new(provider));
@@ -75,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Listening on http://0.0.0.0:3000");
     axum::serve(listener, app).await.unwrap();
-    
+
     Ok(())
 }
 
@@ -87,10 +88,10 @@ async fn oidc_login(State(state): State<AppState>, cookies: Cookies) -> impl Int
     // Note: Some providers have specific scope requirements.
     // For example, Discord does not support the standard 'profile' scope and requires 'identify' instead.
     // If using Discord OIDC, you should use: &["openid", "email", "identify"]
-    let scopes = std::env::var("OIDC_SCOPES")
-        .unwrap_or_else(|_| "openid email profile".to_string());
+    let scopes =
+        std::env::var("OIDC_SCOPES").unwrap_or_else(|_| "openid email profile".to_string());
     let scope_list: Vec<&str> = scopes.split_whitespace().collect();
-    
+
     initiate_oauth_login(&state.oidc_flow, &cookies, &scope_list)
 }
 
@@ -112,7 +113,7 @@ async fn oidc_callback(
 
 async fn protected(AuthSession(session): AuthSession) -> impl IntoResponse {
     println!("Identity verified: {:?}", session.identity);
-    
+
     format!(
         "Hello, {}! Your ID is {}. Your email is {:?}. Attributes: {:?}",
         session.identity.username.unwrap_or_default(),

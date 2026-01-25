@@ -1,4 +1,4 @@
-use authly_core::{Identity, OAuthProvider, OAuthToken, pkce::Pkce};
+use authly_core::{pkce::Pkce, Identity, OAuthProvider, OAuthToken};
 use authly_flow::OAuth2Flow;
 use authly_session::{Session, SessionStore};
 use authly_token::TokenManager;
@@ -8,7 +8,7 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use tower_cookies::{Cookies, Cookie, cookie::SameSite};
+use tower_cookies::{cookie::SameSite, Cookie, Cookies};
 
 #[derive(serde::Deserialize)]
 pub struct OAuthCallbackParams {
@@ -121,7 +121,12 @@ where
             Some(&pkce_verifier),
         )
         .await
-        .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Authentication failed: {}", e)))?;
+        .map_err(|e| {
+            (
+                StatusCode::UNAUTHORIZED,
+                format!("Authentication failed: {}", e),
+            )
+        })?;
 
     Ok((identity, token))
 }
@@ -164,15 +169,12 @@ where
         expires_at: chrono::Utc::now() + session_duration,
     };
 
-    store
-        .save_session(&session)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to save session: {}", e),
-            )
-        })?;
+    store.save_session(&session).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to save session: {}", e),
+        )
+    })?;
 
     let cookie = config.create_cookie(session.id);
     cookies.add(cookie);
@@ -196,7 +198,12 @@ where
 
     let jwt = token_manager
         .issue_user_token(identity, expires_in_secs, None)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Token error: {}", e)))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Token error: {}", e),
+            )
+        })?;
 
     Ok(Json(serde_json::json!({
         "access_token": jwt,

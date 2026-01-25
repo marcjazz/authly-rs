@@ -1,6 +1,6 @@
-use authly_core::{Identity, AuthError};
+use authly_core::{AuthError, Identity};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use jsonwebtoken::{encode, decode, Header, Algorithm, Validation, EncodingKey, DecodingKey};
 use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,7 +36,12 @@ impl TokenManager {
     }
 
     /// Issues a token for a user identity.
-    pub fn issue_user_token(&self, identity: Identity, expires_in_secs: u64, scope: Option<String>) -> Result<String, AuthError> {
+    pub fn issue_user_token(
+        &self,
+        identity: Identity,
+        expires_in_secs: u64,
+        scope: Option<String>,
+    ) -> Result<String, AuthError> {
         let now = chrono::Utc::now().timestamp() as usize;
         let expiration = now + expires_in_secs as usize;
 
@@ -56,7 +61,12 @@ impl TokenManager {
     }
 
     /// Issues a machine-to-machine (M2M) token for a client.
-    pub fn issue_client_token(&self, client_id: &str, expires_in_secs: u64, scope: Option<String>) -> Result<String, AuthError> {
+    pub fn issue_client_token(
+        &self,
+        client_id: &str,
+        expires_in_secs: u64,
+        scope: Option<String>,
+    ) -> Result<String, AuthError> {
         let now = chrono::Utc::now().timestamp() as usize;
         let expiration = now + expires_in_secs as usize;
 
@@ -81,11 +91,8 @@ impl TokenManager {
             validation.set_issuer(&[iss]);
         }
 
-        let token_data = decode::<Claims>(
-            token,
-            &self.decoding_key,
-            &validation,
-        ).map_err(|e| AuthError::Token(e.to_string()))?;
+        let token_data = decode::<Claims>(token, &self.decoding_key, &validation)
+            .map_err(|e| AuthError::Token(e.to_string()))?;
 
         Ok(token_data.claims)
     }

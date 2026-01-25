@@ -27,7 +27,12 @@ impl DiscordProvider {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_test_urls(mut self, token_url: String, user_url: String, revoke_url: String) -> Self {
+    pub(crate) fn with_test_urls(
+        mut self,
+        token_url: String,
+        user_url: String,
+        revoke_url: String,
+    ) -> Self {
         self.token_url = token_url;
         self.user_url = user_url;
         self.revoke_url = revoke_url;
@@ -55,7 +60,12 @@ struct DiscordUserResponse {
 
 #[async_trait]
 impl OAuthProvider for DiscordProvider {
-    fn get_authorization_url(&self, state: &str, scopes: &[&str], code_challenge: Option<&str>) -> String {
+    fn get_authorization_url(
+        &self,
+        state: &str,
+        scopes: &[&str],
+        code_challenge: Option<&str>,
+    ) -> String {
         let scope_param = if scopes.is_empty() {
             "identify email".to_string()
         } else {
@@ -68,13 +78,20 @@ impl OAuthProvider for DiscordProvider {
         );
 
         if let Some(challenge) = code_challenge {
-            url.push_str(&format!("&code_challenge={}&code_challenge_method=S256", challenge));
+            url.push_str(&format!(
+                "&code_challenge={}&code_challenge_method=S256",
+                challenge
+            ));
         }
 
         url
     }
 
-    async fn exchange_code_for_identity(&self, code: &str, code_verifier: Option<&str>) -> Result<(Identity, OAuthToken), AuthError> {
+    async fn exchange_code_for_identity(
+        &self,
+        code: &str,
+        code_verifier: Option<&str>,
+    ) -> Result<(Identity, OAuthToken), AuthError> {
         // 1. Exchange code for access token
         let mut params = vec![
             ("client_id", self.client_id.clone()),
@@ -88,7 +105,8 @@ impl OAuthProvider for DiscordProvider {
             params.push(("code_verifier", verifier.to_string()));
         }
 
-        let token_response = self.http_client
+        let token_response = self
+            .http_client
             .post(&self.token_url)
             .form(&params)
             .send()
@@ -99,9 +117,13 @@ impl OAuthProvider for DiscordProvider {
             .map_err(|e| AuthError::Provider(format!("Failed to parse token response: {}", e)))?;
 
         // 2. Get user information
-        let user_response = self.http_client
+        let user_response = self
+            .http_client
             .get(&self.user_url)
-            .header("Authorization", format!("Bearer {}", token_response.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", token_response.access_token),
+            )
             .send()
             .await
             .map_err(|_| AuthError::Network)?
@@ -137,7 +159,8 @@ impl OAuthProvider for DiscordProvider {
     }
 
     async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, AuthError> {
-        let token_response = self.http_client
+        let token_response = self
+            .http_client
             .post(&self.token_url)
             .form(&[
                 ("client_id", &self.client_id),
@@ -150,20 +173,25 @@ impl OAuthProvider for DiscordProvider {
             .map_err(|_| AuthError::Network)?
             .json::<DiscordAccessTokenResponse>()
             .await
-            .map_err(|e| AuthError::Provider(format!("Failed to parse refresh token response: {}", e)))?;
+            .map_err(|e| {
+                AuthError::Provider(format!("Failed to parse refresh token response: {}", e))
+            })?;
 
         Ok(OAuthToken {
             access_token: token_response.access_token,
             token_type: token_response.token_type,
             expires_in: token_response.expires_in,
-            refresh_token: token_response.refresh_token.or_else(|| Some(refresh_token.to_string())),
+            refresh_token: token_response
+                .refresh_token
+                .or_else(|| Some(refresh_token.to_string())),
             scope: token_response.scope,
             id_token: token_response.id_token,
         })
     }
 
     async fn revoke_token(&self, token: &str) -> Result<(), AuthError> {
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&self.revoke_url)
             .form(&[
                 ("client_id", &self.client_id),
@@ -177,8 +205,14 @@ impl OAuthProvider for DiscordProvider {
         if response.status().is_success() {
             Ok(())
         } else {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            Err(AuthError::Provider(format!("Failed to revoke token: {}", error_text)))
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            Err(AuthError::Provider(format!(
+                "Failed to revoke token: {}",
+                error_text
+            )))
         }
     }
 }
@@ -194,7 +228,8 @@ mod tests {
         let token_url = format!("{}/api/oauth2/token", server.url());
         let user_url = format!("{}/api/users/@me", server.url());
 
-        let _token_mock = server.mock("POST", "/api/oauth2/token")
+        let _token_mock = server
+            .mock("POST", "/api/oauth2/token")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"{"access_token": "test_token", "token_type": "Bearer"}"#)
@@ -212,9 +247,17 @@ mod tests {
             "client_id".to_string(),
             "client_secret".to_string(),
             "http://localhost/callback".to_string(),
-        ).with_test_urls(token_url, user_url, "http://localhost/api/oauth2/token/revoke".to_string());
+        )
+        .with_test_urls(
+            token_url,
+            user_url,
+            "http://localhost/api/oauth2/token/revoke".to_string(),
+        );
 
-        let (identity, token) = provider.exchange_code_for_identity("test_code", None).await.unwrap();
+        let (identity, token) = provider
+            .exchange_code_for_identity("test_code", None)
+            .await
+            .unwrap();
 
         assert_eq!(identity.provider_id, "discord");
         assert_eq!(identity.external_id, "123456789");

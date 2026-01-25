@@ -1,11 +1,11 @@
-use async_trait::async_trait;
-use authly_core::{AuthError, Identity, OAuthProvider, OAuthToken};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use crate::discovery::ProviderMetadata;
 use crate::error::OidcError;
 use crate::jwks::Jwks;
-use jsonwebtoken::{decode, decode_header, Validation, Algorithm};
+use async_trait::async_trait;
+use authly_core::{AuthError, Identity, OAuthProvider, OAuthToken};
+use jsonwebtoken::{decode, decode_header, Algorithm, Validation};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub struct OidcProvider {
     client_id: String,
@@ -42,7 +42,7 @@ impl OidcProvider {
         client_id: String,
         client_secret: String,
         redirect_uri: String,
-        issuer_url: &str
+        issuer_url: &str,
     ) -> Result<Self, OidcError> {
         let client = reqwest::Client::new();
         let metadata = ProviderMetadata::discover(issuer_url, &client).await?;
@@ -62,12 +62,17 @@ impl OidcProvider {
 
 #[async_trait]
 impl OAuthProvider for OidcProvider {
-    fn get_authorization_url(&self, state: &str, scopes: &[&str], code_challenge: Option<&str>) -> String {
+    fn get_authorization_url(
+        &self,
+        state: &str,
+        scopes: &[&str],
+        code_challenge: Option<&str>,
+    ) -> String {
         let mut full_scopes = scopes.to_vec();
         if !full_scopes.contains(&"openid") {
             full_scopes.push("openid");
         }
-        
+
         let scope_param = full_scopes.join(" ");
 
         let mut url = format!(
@@ -80,13 +85,20 @@ impl OAuthProvider for OidcProvider {
         );
 
         if let Some(challenge) = code_challenge {
-            url.push_str(&format!("&code_challenge={}&code_challenge_method=S256", challenge));
+            url.push_str(&format!(
+                "&code_challenge={}&code_challenge_method=S256",
+                challenge
+            ));
         }
 
         url
     }
 
-    async fn exchange_code_for_identity(&self, code: &str, code_verifier: Option<&str>) -> Result<(Identity, OAuthToken), AuthError> {
+    async fn exchange_code_for_identity(
+        &self,
+        code: &str,
+        code_verifier: Option<&str>,
+    ) -> Result<(Identity, OAuthToken), AuthError> {
         // 1. Exchange code for tokens
         let mut params = vec![
             ("grant_type", "authorization_code".to_string()),
@@ -100,7 +112,8 @@ impl OAuthProvider for OidcProvider {
             params.push(("code_verifier", verifier.to_string()));
         }
 
-        let token_response = self.http_client
+        let token_response = self
+            .http_client
             .post(&self.metadata.token_endpoint)
             .form(&params)
             .send()
@@ -110,31 +123,31 @@ impl OAuthProvider for OidcProvider {
             .await
             .map_err(|e| AuthError::Provider(format!("Failed to parse token response: {}", e)))?;
 
-        let id_token = token_response.id_token.ok_or_else(|| AuthError::Token("Missing id_token in response".to_string()))?;
+        let id_token = token_response
+            .id_token
+            .ok_or_else(|| AuthError::Token("Missing id_token in response".to_string()))?;
 
         // 2. Fetch JWKS
-        let jwks = Jwks::fetch(&self.metadata.jwks_uri, &self.http_client).await
+        let jwks = Jwks::fetch(&self.metadata.jwks_uri, &self.http_client)
+            .await
             .map_err(|e| AuthError::from(e))?;
 
         // 3. Decode and Validate ID Token
         let header = decode_header(&id_token)
             .map_err(|e| AuthError::Token(format!("Invalid ID Token header: {}", e)))?;
-        
-        let jwk = jwks.find_key(header.kid.as_deref())
+
+        let jwk = jwks
+            .find_key(header.kid.as_deref())
             .ok_or_else(|| AuthError::Token("No matching key found in JWKS".to_string()))?;
 
-        let decoding_key = jwk.to_decoding_key()
-            .map_err(|e| AuthError::from(e))?;
+        let decoding_key = jwk.to_decoding_key().map_err(|e| AuthError::from(e))?;
 
         let mut validation = Validation::new(Algorithm::RS256);
         validation.set_issuer(&[self.metadata.issuer.clone()]);
         validation.set_audience(&[self.client_id.clone()]);
 
-        let token_data = decode::<Claims>(
-            &id_token,
-            &decoding_key,
-            &validation
-        ).map_err(|e| AuthError::Token(format!("ID Token validation failed: {}", e)))?;
+        let token_data = decode::<Claims>(&id_token, &decoding_key, &validation)
+            .map_err(|e| AuthError::Token(format!("ID Token validation failed: {}", e)))?;
 
         let claims = token_data.claims;
 

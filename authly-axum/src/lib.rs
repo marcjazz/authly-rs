@@ -50,12 +50,20 @@ where
 
         let cookies = <Cookies as FromRequestParts<S>>::from_request_parts(parts, state)
             .await
-            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Cookies error".to_string()))?;
+            .map_err(|_| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Cookies error".to_string(),
+                )
+            })?;
 
         let session_id = cookies
             .get(&config.cookie_name)
             .map(|c: Cookie| c.value().to_string())
-            .ok_or((StatusCode::UNAUTHORIZED, "Missing session cookie".to_string()))?;
+            .ok_or((
+                StatusCode::UNAUTHORIZED,
+                "Missing session cookie".to_string(),
+            ))?;
 
         let session = store
             .load_session(&session_id)
@@ -87,10 +95,16 @@ where
             .headers
             .get(header::AUTHORIZATION)
             .and_then(|h| h.to_str().ok())
-            .ok_or((StatusCode::UNAUTHORIZED, "Missing Authorization header".to_string()))?;
+            .ok_or((
+                StatusCode::UNAUTHORIZED,
+                "Missing Authorization header".to_string(),
+            ))?;
 
         if !auth_header.starts_with("Bearer ") {
-            return Err((StatusCode::UNAUTHORIZED, "Invalid Authorization header".to_string()));
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "Invalid Authorization header".to_string(),
+            ));
         }
 
         let token = &auth_header[7..];

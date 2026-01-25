@@ -56,7 +56,12 @@ struct GithubUserResponse {
 
 #[async_trait]
 impl OAuthProvider for GithubProvider {
-    fn get_authorization_url(&self, state: &str, scopes: &[&str], _code_challenge: Option<&str>) -> String {
+    fn get_authorization_url(
+        &self,
+        state: &str,
+        scopes: &[&str],
+        _code_challenge: Option<&str>,
+    ) -> String {
         let scope_param = if scopes.is_empty() {
             "user:email".to_string()
         } else {
@@ -69,9 +74,14 @@ impl OAuthProvider for GithubProvider {
         )
     }
 
-    async fn exchange_code_for_identity(&self, code: &str, _code_verifier: Option<&str>) -> Result<(Identity, OAuthToken), AuthError> {
+    async fn exchange_code_for_identity(
+        &self,
+        code: &str,
+        _code_verifier: Option<&str>,
+    ) -> Result<(Identity, OAuthToken), AuthError> {
         // 1. Exchange code for access token
-        let token_response = self.http_client
+        let token_response = self
+            .http_client
             .post(&self.token_url)
             .header("Accept", "application/json")
             .form(&[
@@ -88,9 +98,13 @@ impl OAuthProvider for GithubProvider {
             .map_err(|e| AuthError::Provider(format!("Failed to parse token response: {}", e)))?;
 
         // 2. Get user information
-        let user_response = self.http_client
+        let user_response = self
+            .http_client
             .get(&self.user_url)
-            .header("Authorization", format!("Bearer {}", token_response.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", token_response.access_token),
+            )
             .header("User-Agent", "authly-rs")
             .send()
             .await
@@ -121,7 +135,8 @@ impl OAuthProvider for GithubProvider {
     }
 
     async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, AuthError> {
-        let token_response = self.http_client
+        let token_response = self
+            .http_client
             .post(&self.token_url)
             .header("Accept", "application/json")
             .form(&[
@@ -135,21 +150,29 @@ impl OAuthProvider for GithubProvider {
             .map_err(|_| AuthError::Network)?
             .json::<GithubAccessTokenResponse>()
             .await
-            .map_err(|e| AuthError::Provider(format!("Failed to parse refresh token response: {}", e)))?;
+            .map_err(|e| {
+                AuthError::Provider(format!("Failed to parse refresh token response: {}", e))
+            })?;
 
         Ok(OAuthToken {
             access_token: token_response.access_token,
             token_type: token_response.token_type,
             expires_in: token_response.expires_in,
-            refresh_token: token_response.refresh_token.or_else(|| Some(refresh_token.to_string())),
+            refresh_token: token_response
+                .refresh_token
+                .or_else(|| Some(refresh_token.to_string())),
             scope: token_response.scope,
             id_token: token_response.id_token,
         })
     }
 
     async fn revoke_token(&self, token: &str) -> Result<(), AuthError> {
-        let response = self.http_client
-            .delete(format!("https://api.github.com/applications/{}/token", self.client_id))
+        let response = self
+            .http_client
+            .delete(format!(
+                "https://api.github.com/applications/{}/token",
+                self.client_id
+            ))
             .basic_auth(&self.client_id, Some(&self.client_secret))
             .header("User-Agent", "authly-rs")
             .json(&serde_json::json!({
@@ -162,8 +185,14 @@ impl OAuthProvider for GithubProvider {
         if response.status().is_success() || response.status() == reqwest::StatusCode::NO_CONTENT {
             Ok(())
         } else {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            Err(AuthError::Provider(format!("Failed to revoke token: {}", error_text)))
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            Err(AuthError::Provider(format!(
+                "Failed to revoke token: {}",
+                error_text
+            )))
         }
     }
 }
@@ -179,14 +208,16 @@ mod tests {
         let token_url = format!("{}/login/oauth/access_token", server.url());
         let user_url = format!("{}/user", server.url());
 
-        let _token_mock = server.mock("POST", "/login/oauth/access_token")
+        let _token_mock = server
+            .mock("POST", "/login/oauth/access_token")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"{"access_token": "test_token", "token_type": "bearer"}"#)
             .create_async()
             .await;
 
-        let _user_mock = server.mock("GET", "/user")
+        let _user_mock = server
+            .mock("GET", "/user")
             .with_status(200)
             .with_header("content-type", "application/json")
             .with_body(r#"{"id": 123, "login": "testuser", "email": "test@example.com"}"#)
@@ -197,9 +228,13 @@ mod tests {
             "client_id".to_string(),
             "client_secret".to_string(),
             "http://localhost/callback".to_string(),
-        ).with_test_urls(token_url, user_url);
+        )
+        .with_test_urls(token_url, user_url);
 
-        let (identity, token) = provider.exchange_code_for_identity("test_code", None).await.unwrap();
+        let (identity, token) = provider
+            .exchange_code_for_identity("test_code", None)
+            .await
+            .unwrap();
 
         assert_eq!(identity.provider_id, "github");
         assert_eq!(identity.external_id, "123");

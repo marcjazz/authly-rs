@@ -63,9 +63,9 @@ impl UserMapper for SqlxUserMapper {
         // Mocking SQLx query
         // let user = sqlx::query_as!(LocalUser, "SELECT id, username, role FROM users WHERE external_id = $1", identity.external_id)
         //     .fetch_one(&self.pool).await?;
-        
+
         println!("Mapping identity {} to local user", identity.external_id);
-        
+
         Ok(LocalUser {
             id: 1,
             username: identity.username.clone().unwrap_or_default(),
@@ -99,7 +99,7 @@ async fn main() {
     let provider = MyCredentialsProvider;
     let mapper = SqlxUserMapper {};
     let auth_flow = Arc::new(CredentialsFlow::with_mapper(provider, mapper));
-    
+
     let session_store = Arc::new(authly_session::MemoryStore::default());
 
     let state = AppState {
@@ -121,13 +121,15 @@ async fn main() {
 }
 
 async fn index() -> impl IntoResponse {
-    axum::response::Html(r#"
+    axum::response::Html(
+        r#"
         <form action="/login" method="post">
             <input type="text" name="username" placeholder="Username" />
             <input type="password" name="password" placeholder="Password" />
             <button type="submit">Login</button>
         </form>
-    "#)
+    "#,
+    )
 }
 
 async fn login(
@@ -135,7 +137,10 @@ async fn login(
     cookies: Cookies,
     Form(creds): Form<LoginCredentials>,
 ) -> Result<impl IntoResponse, (axum::http::StatusCode, String)> {
-    let (identity, local_user) = state.auth_flow.authenticate(creds).await
+    let (identity, local_user) = state
+        .auth_flow
+        .authenticate(creds)
+        .await
         .map_err(|e| (axum::http::StatusCode::UNAUTHORIZED, e.to_string()))?;
 
     // local_user is Some(LocalUser { ... }) because we used with_mapper
@@ -149,7 +154,10 @@ async fn login(
         expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
     };
 
-    state.session_store.save_session(&session).await
+    state
+        .session_store
+        .save_session(&session)
+        .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let cookie = state.session_config.create_cookie(session.id);
@@ -159,8 +167,9 @@ async fn login(
 }
 
 async fn protected(AuthSession(session): AuthSession) -> impl IntoResponse {
-    format!("Hello, {}! Your ID is {}. Session ID: {}", 
-        session.identity.username.unwrap_or_default(), 
+    format!(
+        "Hello, {}! Your ID is {}. Session ID: {}",
+        session.identity.username.unwrap_or_default(),
         session.identity.external_id,
         session.id
     )

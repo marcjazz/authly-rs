@@ -1,5 +1,5 @@
-use thiserror::Error;
 use authly_core::AuthError;
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum OidcError {

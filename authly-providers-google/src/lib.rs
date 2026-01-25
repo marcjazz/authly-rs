@@ -29,7 +29,13 @@ impl GoogleProvider {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_test_urls(mut self, auth_url: String, token_url: String, userinfo_url: String, revoke_url: String) -> Self {
+    pub(crate) fn with_test_urls(
+        mut self,
+        auth_url: String,
+        token_url: String,
+        userinfo_url: String,
+        revoke_url: String,
+    ) -> Self {
         self.auth_url = auth_url;
         self.token_url = token_url;
         self.userinfo_url = userinfo_url;
@@ -60,7 +66,12 @@ struct GoogleUserResponse {
 
 #[async_trait]
 impl OAuthProvider for GoogleProvider {
-    fn get_authorization_url(&self, state: &str, scopes: &[&str], code_challenge: Option<&str>) -> String {
+    fn get_authorization_url(
+        &self,
+        state: &str,
+        scopes: &[&str],
+        code_challenge: Option<&str>,
+    ) -> String {
         let scope_param = if scopes.is_empty() {
             "openid email profile".to_string()
         } else {
@@ -73,13 +84,20 @@ impl OAuthProvider for GoogleProvider {
         );
 
         if let Some(challenge) = code_challenge {
-            url.push_str(&format!("&code_challenge={}&code_challenge_method=S256", challenge));
+            url.push_str(&format!(
+                "&code_challenge={}&code_challenge_method=S256",
+                challenge
+            ));
         }
 
         url
     }
 
-    async fn exchange_code_for_identity(&self, code: &str, code_verifier: Option<&str>) -> Result<(Identity, OAuthToken), AuthError> {
+    async fn exchange_code_for_identity(
+        &self,
+        code: &str,
+        code_verifier: Option<&str>,
+    ) -> Result<(Identity, OAuthToken), AuthError> {
         // 1. Exchange code for access token
         let mut params = vec![
             ("code", code.to_string()),
@@ -93,7 +111,8 @@ impl OAuthProvider for GoogleProvider {
             params.push(("code_verifier", verifier.to_string()));
         }
 
-        let token_response = self.http_client
+        let token_response = self
+            .http_client
             .post(&self.token_url)
             .form(&params)
             .send()
@@ -104,9 +123,13 @@ impl OAuthProvider for GoogleProvider {
             .map_err(|e| AuthError::Provider(format!("Failed to parse token response: {}", e)))?;
 
         // 2. Get user information
-        let user_response = self.http_client
+        let user_response = self
+            .http_client
             .get(&self.userinfo_url)
-            .header("Authorization", format!("Bearer {}", token_response.access_token))
+            .header(
+                "Authorization",
+                format!("Bearer {}", token_response.access_token),
+            )
             .send()
             .await
             .map_err(|_| AuthError::Network)?
@@ -147,7 +170,8 @@ impl OAuthProvider for GoogleProvider {
     }
 
     async fn refresh_token(&self, refresh_token: &str) -> Result<OAuthToken, AuthError> {
-        let token_response = self.http_client
+        let token_response = self
+            .http_client
             .post(&self.token_url)
             .form(&[
                 ("refresh_token", refresh_token),
@@ -160,20 +184,25 @@ impl OAuthProvider for GoogleProvider {
             .map_err(|_| AuthError::Network)?
             .json::<GoogleTokenResponse>()
             .await
-            .map_err(|e| AuthError::Provider(format!("Failed to parse refresh token response: {}", e)))?;
+            .map_err(|e| {
+                AuthError::Provider(format!("Failed to parse refresh token response: {}", e))
+            })?;
 
         Ok(OAuthToken {
             access_token: token_response.access_token,
             token_type: token_response.token_type,
             expires_in: token_response.expires_in,
-            refresh_token: token_response.refresh_token.or_else(|| Some(refresh_token.to_string())),
+            refresh_token: token_response
+                .refresh_token
+                .or_else(|| Some(refresh_token.to_string())),
             scope: token_response.scope,
             id_token: token_response.id_token,
         })
     }
 
     async fn revoke_token(&self, token: &str) -> Result<(), AuthError> {
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&self.revoke_url)
             .form(&[("token", token)])
             .send()
@@ -183,8 +212,14 @@ impl OAuthProvider for GoogleProvider {
         if response.status().is_success() {
             Ok(())
         } else {
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            Err(AuthError::Provider(format!("Failed to revoke token: {}", error_text)))
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            Err(AuthError::Provider(format!(
+                "Failed to revoke token: {}",
+                error_text
+            )))
         }
     }
 }
@@ -208,17 +243,20 @@ mod tests {
             .create_async()
             .await;
 
-        let _user_mock = server.mock("GET", "/userinfo")
+        let _user_mock = server
+            .mock("GET", "/userinfo")
             .with_status(200)
             .with_header("content-type", "application/json")
-            .with_body(r#"{
+            .with_body(
+                r#"{
                 "sub": "google-123",
                 "email": "test@google.com",
                 "name": "Google User",
                 "picture": "http://picture",
                 "email_verified": true,
                 "locale": "en"
-            }"#)
+            }"#,
+            )
             .create_async()
             .await;
 
@@ -226,15 +264,27 @@ mod tests {
             "client_id".to_string(),
             "client_secret".to_string(),
             "http://localhost/callback".to_string(),
-        ).with_test_urls(auth_url, token_url, userinfo_url, "http://localhost/revoke".to_string());
+        )
+        .with_test_urls(
+            auth_url,
+            token_url,
+            userinfo_url,
+            "http://localhost/revoke".to_string(),
+        );
 
-        let (identity, token) = provider.exchange_code_for_identity("test_code", None).await.unwrap();
+        let (identity, token) = provider
+            .exchange_code_for_identity("test_code", None)
+            .await
+            .unwrap();
 
         assert_eq!(identity.provider_id, "google");
         assert_eq!(identity.external_id, "google-123");
         assert_eq!(identity.username, Some("Google User".to_string()));
         assert_eq!(identity.email, Some("test@google.com".to_string()));
-        assert_eq!(identity.attributes.get("picture").unwrap(), "http://picture");
+        assert_eq!(
+            identity.attributes.get("picture").unwrap(),
+            "http://picture"
+        );
         assert_eq!(identity.attributes.get("email_verified").unwrap(), "true");
         assert_eq!(identity.attributes.get("locale").unwrap(), "en");
         assert_eq!(token.access_token, "test_token");

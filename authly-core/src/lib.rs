@@ -66,19 +66,32 @@ pub enum AuthError {
 #[async_trait]
 pub trait OAuthProvider: Send + Sync {
     /// Helper to get the authorization URL.
-    fn get_authorization_url(&self, state: &str, scopes: &[&str], code_challenge: Option<&str>) -> String;
-    
+    fn get_authorization_url(
+        &self,
+        state: &str,
+        scopes: &[&str],
+        code_challenge: Option<&str>,
+    ) -> String;
+
     /// Exchange an authorization code for an Identity.
-    async fn exchange_code_for_identity(&self, code: &str, code_verifier: Option<&str>) -> Result<(Identity, OAuthToken), AuthError>;
+    async fn exchange_code_for_identity(
+        &self,
+        code: &str,
+        code_verifier: Option<&str>,
+    ) -> Result<(Identity, OAuthToken), AuthError>;
 
     /// Refresh an access token using a refresh token.
     async fn refresh_token(&self, _refresh_token: &str) -> Result<OAuthToken, AuthError> {
-        Err(AuthError::Provider("Token refresh not supported by this provider".into()))
+        Err(AuthError::Provider(
+            "Token refresh not supported by this provider".into(),
+        ))
     }
 
     /// Revoke an access token.
     async fn revoke_token(&self, _token: &str) -> Result<(), AuthError> {
-        Err(AuthError::Provider("Token revocation not supported by this provider".into()))
+        Err(AuthError::Provider(
+            "Token revocation not supported by this provider".into(),
+        ))
     }
 }
 
@@ -86,7 +99,7 @@ pub trait OAuthProvider: Send + Sync {
 #[async_trait]
 pub trait CredentialsProvider: Send + Sync {
     type Credentials;
-    
+
     /// Validate credentials and return an Identity.
     async fn authenticate(&self, creds: Self::Credentials) -> Result<Identity, AuthError>;
 }
@@ -108,4 +121,3 @@ impl UserMapper for () {
         Ok(())
     }
 }
-
