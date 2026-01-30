@@ -1,3 +1,5 @@
+pub mod offline_validation;
+
 use authly_core::{AuthError, Identity};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
