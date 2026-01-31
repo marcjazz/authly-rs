@@ -1,8 +1,8 @@
+use arc_swap::ArcSwap;
+use jsonwebtoken::{decode, decode_header, jwk::JwkSet, DecodingKey, Validation};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use arc_swap::ArcSwap;
-use jsonwebtoken::{decode, decode_header, DecodingKey, Validation, jwk::JwkSet};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::RwLock;
 
@@ -45,7 +45,10 @@ pub struct JwksCache {
 
 impl JwksCache {
     /// Creates a new JWKS cache and fetches the initial set.
-    pub async fn new(jwks_uri: String, refresh_interval: Duration) -> Result<Self, ValidationError> {
+    pub async fn new(
+        jwks_uri: String,
+        refresh_interval: Duration,
+    ) -> Result<Self, ValidationError> {
         let jwks = Self::fetch_jwks(&jwks_uri).await?;
         Ok(Self {
             jwks_uri,
@@ -90,27 +93,28 @@ pub async fn validate_jwt(
     validation: &Validation,
 ) -> Result<Claims, ValidationError> {
     cache.refresh_if_needed().await?;
-    
+
     let header = decode_header(token)?;
-    let kid = header.kid.ok_or_else(|| ValidationError::InvalidToken("Missing kid header".to_string()))?;
-    
+    let kid = header
+        .kid
+        .ok_or_else(|| ValidationError::InvalidToken("Missing kid header".to_string()))?;
+
     let jwks = cache.get_jwks();
     let jwk = jwks.find(&kid).ok_or(ValidationError::KeyNotFound)?;
-    
+
     let decoding_key = DecodingKey::from_jwk(jwk)?;
     let token_data = decode::<Claims>(token, &decoding_key, validation)?;
-    
+
     Ok(token_data.claims)
 }
 
 /// Validates a PASETO V4 Local/Public token.
 /// Note: This implementation assumes V4 Public for parity with JWKS-like usage if applicable,
 /// but PASETO usually handles its own keying. This is a placeholder for the requested logic.
-pub async fn validate_paseto(
-    _token: &str,
-    _key: &[u8],
-) -> Result<Claims, ValidationError> {
+pub async fn validate_paseto(_token: &str, _key: &[u8]) -> Result<Claims, ValidationError> {
     // PASETO validation logic using the `paseto` crate
     // For now, returning an error as PASETO JWKS integration is non-standard
-    Err(ValidationError::Paseto("PASETO validation not yet fully implemented with JWKS".to_string()))
+    Err(ValidationError::Paseto(
+        "PASETO validation not yet fully implemented with JWKS".to_string(),
+    ))
 }

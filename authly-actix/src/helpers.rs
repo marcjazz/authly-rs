@@ -1,4 +1,4 @@
-use actix_web::{http::header, cookie::Cookie, HttpResponse, HttpRequest};
+use actix_web::{cookie::Cookie, http::header, HttpRequest, HttpResponse};
 use authly_core::{pkce::Pkce, OAuthProvider};
 use authly_flow::OAuth2Flow;
 use authly_session::{Session, SessionStore};
@@ -40,7 +40,7 @@ impl SessionConfig {
             .secure(self.secure)
             .http_only(self.http_only)
             .same_site(self.same_site);
-        
+
         if let Some(max_age) = self.max_age {
             builder = builder.max_age(actix_web::cookie::time::Duration::seconds(
                 max_age.num_seconds(),
@@ -53,10 +53,7 @@ impl SessionConfig {
 /// Helper to initiate the OAuth2 login flow.
 ///
 /// This generates the authorization URL and sets a CSRF state cookie.
-pub fn initiate_oauth_login<P, M>(
-    flow: &OAuth2Flow<P, M>,
-    scopes: &[&str],
-) -> HttpResponse
+pub fn initiate_oauth_login<P, M>(flow: &OAuth2Flow<P, M>, scopes: &[&str]) -> HttpResponse
 where
     P: OAuthProvider,
     M: authly_core::UserMapper,
@@ -94,9 +91,12 @@ where
     M: authly_core::UserMapper + Send + Sync,
 {
     let cookie_name = format!("authly_flow_{}", params.state);
-    let pkce_verifier = req.cookie(&cookie_name)
+    let pkce_verifier = req
+        .cookie(&cookie_name)
         .map(|c| c.value().to_string())
-        .ok_or_else(|| actix_web::error::ErrorUnauthorized("CSRF validation failed or session expired"))?;
+        .ok_or_else(|| {
+            actix_web::error::ErrorUnauthorized("CSRF validation failed or session expired")
+        })?;
 
     // Exchange code
     let (mut identity, token, _local_user) = flow
@@ -107,13 +107,19 @@ where
             Some(&pkce_verifier),
         )
         .await
-        .map_err(|e| actix_web::error::ErrorUnauthorized(format!("Authentication failed: {}", e)))?;
+        .map_err(|e| {
+            actix_web::error::ErrorUnauthorized(format!("Authentication failed: {}", e))
+        })?;
 
     // Store tokens in identity attributes for convenience
-    identity.attributes.insert("access_token".to_string(), token.access_token);
+    identity
+        .attributes
+        .insert("access_token".to_string(), token.access_token);
     if let Some(expires_in) = token.expires_in {
         let expires_at = chrono::Utc::now().timestamp() + expires_in as i64;
-        identity.attributes.insert("expires_at".to_string(), expires_at.to_string());
+        identity
+            .attributes
+            .insert("expires_at".to_string(), expires_at.to_string());
     }
     if let Some(rt) = token.refresh_token {
         identity.attributes.insert("refresh_token".to_string(), rt);
@@ -127,11 +133,12 @@ where
         expires_at: chrono::Utc::now() + session_duration,
     };
 
-    store.save_session(&session).await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Failed to save session: {}", e)))?;
+    store.save_session(&session).await.map_err(|e| {
+        actix_web::error::ErrorInternalServerError(format!("Failed to save session: {}", e))
+    })?;
 
     let cookie = config.create_cookie(session.id);
-    
+
     // Remove the flow cookie
     let remove_cookie = Cookie::build(cookie_name, "")
         .path("/")
@@ -153,11 +160,14 @@ pub async fn logout(
     config: SessionConfig,
     redirect_to: &str,
 ) -> Result<HttpResponse, actix_web::Error> {
-    let session_id = req.cookie(&config.cookie_name)
+    let session_id = req
+        .cookie(&config.cookie_name)
         .map(|c| c.value().to_string());
 
     if let Some(id) = session_id {
-        store.delete_session(&id).await
+        store
+            .delete_session(&id)
+            .await
             .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
     }
 
