@@ -1,6 +1,6 @@
 # authly-core
 
-Core traits and data structures for the [authly-rs](https://github.com/marcorichetta/authly-rs) ecosystem.
+Core traits and data structures for the [authly-rs](https://github.com/marcjazz/authly-rs) ecosystem.
 
 This crate provides the foundational types and traits used across the `authly` framework, ensuring a consistent API for authentication providers, session stores, and identity management.
 
@@ -23,4 +23,4 @@ authly-core = "0.1.0"
 
 ## Part of authly-rs
 
-This crate is part of the [authly-rs](https://github.com/marcorichetta/authly-rs) workspace. `authly` is a modular, framework-agnostic authentication orchestration system for Rust.
+This crate is part of the [authly-rs](https://github.com/marcjazz/authly-rs) workspace. `authly` is a modular, framework-agnostic authentication orchestration system for Rust.
