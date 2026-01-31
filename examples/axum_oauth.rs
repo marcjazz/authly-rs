@@ -185,8 +185,13 @@ async fn github_callback(
 // --- Google Handlers ---
 async fn google_login(State(state): State<AppState>, cookies: Cookies) -> Response {
     if let Some(flow) = &state.google_flow {
-        initiate_oauth_login(flow, &state.session_config, &cookies, &["openid", "email", "profile"])
-            .into_response()
+        initiate_oauth_login(
+            flow,
+            &state.session_config,
+            &cookies,
+            &["openid", "email", "profile"],
+        )
+        .into_response()
     } else {
         (
             axum::http::StatusCode::NOT_IMPLEMENTED,
@@ -224,8 +229,13 @@ async fn google_callback(
 // --- Discord Handlers ---
 async fn discord_login(State(state): State<AppState>, cookies: Cookies) -> Response {
     if let Some(flow) = &state.discord_flow {
-        initiate_oauth_login(flow, &state.session_config, &cookies, &["identify", "email"])
-            .into_response()
+        initiate_oauth_login(
+            flow,
+            &state.session_config,
+            &cookies,
+            &["identify", "email"],
+        )
+        .into_response()
     } else {
         (
             axum::http::StatusCode::NOT_IMPLEMENTED,

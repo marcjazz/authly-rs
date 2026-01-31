@@ -281,17 +281,21 @@ pub async fn get_token(
     parts: &Parts,
     token_manager: &TokenManager,
 ) -> Result<authly_token::Claims, AuthlyAxumError> {
-    let auth_header = parts.headers
+    let auth_header = parts
+        .headers
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok())
         .ok_or_else(|| AuthlyAxumError::Unauthorized("Missing Authorization header".to_string()))?;
 
     if !auth_header.starts_with("Bearer ") {
-        return Err(AuthlyAxumError::Unauthorized("Invalid Authorization header".to_string()));
+        return Err(AuthlyAxumError::Unauthorized(
+            "Invalid Authorization header".to_string(),
+        ));
     }
 
     let token = &auth_header[7..];
-    let claims = token_manager.validate_token(token)
+    let claims = token_manager
+        .validate_token(token)
         .map_err(|e| AuthlyAxumError::Unauthorized(format!("Invalid token: {}", e)))?;
 
     Ok(claims)
