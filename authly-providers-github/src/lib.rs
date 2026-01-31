@@ -34,10 +34,7 @@ impl GithubProvider {
     }
 
     pub fn with_authorization_url(mut self, authorization_url: String) -> Self {
-        // This field is not directly stored in GithubProvider, but is used in get_authorization_url.
-        // For testing, we'll modify the base URL used in get_authorization_url.
-        // This is a simplification for testing purposes.
-        // In a real scenario, the base URL for authorization would be part of the OAuthProvider trait or a configurable client.
+        self.authorization_url = authorization_url;
         self
     }
 }
