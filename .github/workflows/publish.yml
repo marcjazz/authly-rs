@@ -52,6 +52,6 @@ jobs:
               echo "Publishing $pkg..."
               cargo publish --package "$pkg"
               # Wait a few seconds for the registry index to update
-              sleep 5
+              sleep 10
             fi
           done
