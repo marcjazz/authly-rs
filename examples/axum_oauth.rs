@@ -95,7 +95,10 @@ async fn main() {
         google_flow,
         discord_flow,
         session_store,
-        session_config: SessionConfig::default(),
+        session_config: SessionConfig {
+            secure: false,
+            ..Default::default()
+        },
     };
 
     let mut app = Router::new()
@@ -144,7 +147,7 @@ async fn index(State(state): State<AppState>) -> impl IntoResponse {
 // --- GitHub Handlers ---
 async fn github_login(State(state): State<AppState>, cookies: Cookies) -> Response {
     if let Some(flow) = &state.github_flow {
-        initiate_oauth_login(flow, &cookies, &["user:email"]).into_response()
+        initiate_oauth_login(flow, &state.session_config, &cookies, &["user:email"]).into_response()
     } else {
         (
             axum::http::StatusCode::NOT_IMPLEMENTED,
@@ -182,7 +185,8 @@ async fn github_callback(
 // --- Google Handlers ---
 async fn google_login(State(state): State<AppState>, cookies: Cookies) -> Response {
     if let Some(flow) = &state.google_flow {
-        initiate_oauth_login(flow, &cookies, &["openid", "email", "profile"]).into_response()
+        initiate_oauth_login(flow, &state.session_config, &cookies, &["openid", "email", "profile"])
+            .into_response()
     } else {
         (
             axum::http::StatusCode::NOT_IMPLEMENTED,
@@ -220,7 +224,8 @@ async fn google_callback(
 // --- Discord Handlers ---
 async fn discord_login(State(state): State<AppState>, cookies: Cookies) -> Response {
     if let Some(flow) = &state.discord_flow {
-        initiate_oauth_login(flow, &cookies, &["identify", "email"]).into_response()
+        initiate_oauth_login(flow, &state.session_config, &cookies, &["identify", "email"])
+            .into_response()
     } else {
         (
             axum::http::StatusCode::NOT_IMPLEMENTED,

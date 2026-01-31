@@ -22,7 +22,7 @@ async fn index() -> impl Responder {
 
 #[get("/auth/github")]
 async fn github_login(data: web::Data<AppState>) -> impl Responder {
-    initiate_oauth_login(&data.github_flow, &["user:email"])
+    initiate_oauth_login(&data.github_flow, &data.session_config, &["user:email"])
 }
 
 #[get("/auth/github/callback")]

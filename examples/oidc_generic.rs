@@ -92,7 +92,7 @@ async fn oidc_login(State(state): State<AppState>, cookies: Cookies) -> impl Int
         std::env::var("OIDC_SCOPES").unwrap_or_else(|_| "openid email profile".to_string());
     let scope_list: Vec<&str> = scopes.split_whitespace().collect();
 
-    initiate_oauth_login(&state.oidc_flow, &cookies, &scope_list)
+    initiate_oauth_login(&state.oidc_flow, &state.session_config, &cookies, &scope_list)
 }
 
 async fn oidc_callback(
