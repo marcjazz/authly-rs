@@ -3,7 +3,7 @@ use authly_flow::OAuth2Flow;
 use authly_session::{Session, SessionStore};
 use authly_token::TokenManager;
 use axum::{
-    http::StatusCode,
+    http::{request::Parts, StatusCode},
     response::{IntoResponse, Redirect},
     Json,
 };
@@ -237,4 +237,59 @@ pub async fn logout(
     cookies.remove(cookie);
 
     Ok(Redirect::to(redirect_to))
+}
+
+#[derive(Debug)]
+pub enum AuthlyAxumError {
+    Unauthorized(String),
+    Internal(String),
+}
+
+impl IntoResponse for AuthlyAxumError {
+    fn into_response(self) -> axum::response::Response {
+        let (status, message) = match self {
+            AuthlyAxumError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
+            AuthlyAxumError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
+        };
+        (status, message).into_response()
+    }
+}
+
+pub async fn get_session(
+    store: &Arc<dyn SessionStore>,
+    config: &SessionConfig,
+    cookies: &Cookies,
+) -> Result<Session, AuthlyAxumError> {
+    let session_id = cookies
+        .get(&config.cookie_name)
+        .map(|c| c.value().to_string())
+        .ok_or_else(|| AuthlyAxumError::Unauthorized("Missing session cookie".to_string()))?;
+
+    let session = store
+        .load_session(&session_id)
+        .await
+        .map_err(|e| AuthlyAxumError::Internal(e.to_string()))?
+        .ok_or_else(|| AuthlyAxumError::Unauthorized("Invalid session".to_string()))?;
+
+    Ok(session)
+}
+
+pub async fn get_token(
+    parts: &Parts,
+    token_manager: &TokenManager,
+) -> Result<authly_token::Claims, AuthlyAxumError> {
+    let auth_header = parts.headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| AuthlyAxumError::Unauthorized("Missing Authorization header".to_string()))?;
+
+    if !auth_header.starts_with("Bearer ") {
+        return Err(AuthlyAxumError::Unauthorized("Invalid Authorization header".to_string()));
+    }
+
+    let token = &auth_header[7..];
+    let claims = token_manager.validate_token(token)
+        .map_err(|e| AuthlyAxumError::Unauthorized(format!("Invalid token: {}", e)))?;
+
+    Ok(claims)
 }

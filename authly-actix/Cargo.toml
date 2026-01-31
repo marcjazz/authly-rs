@@ -16,7 +16,7 @@ authly-flow = { path = "../authly-flow" }
 actix-web = "4"
 serde = { version = "1.0", features = ["derive"] }
 futures = "0.3"
-thiserror = "1.0"
+thiserror = "2.0.18"
 tracing = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4"] }
