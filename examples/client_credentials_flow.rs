@@ -5,16 +5,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example using a hypothetical provider
     // In a real scenario, you would use your OAuth2 provider's client credentials credentials
     let client_id = std::env::var("CLIENT_ID").unwrap_or_else(|_| "your_client_id".to_string());
-    let client_secret = std::env::var("CLIENT_SECRET").unwrap_or_else(|_| "your_client_secret".to_string());
-    let token_url = std::env::var("TOKEN_URL").unwrap_or_else(|_| "https://example.com/oauth/token".to_string());
+    let client_secret =
+        std::env::var("CLIENT_SECRET").unwrap_or_else(|_| "your_client_secret".to_string());
+    let token_url = std::env::var("TOKEN_URL")
+        .unwrap_or_else(|_| "https://example.com/oauth/token".to_string());
 
     println!("Starting Client Credentials Flow...");
 
-    let flow = ClientCredentialsFlow::new(
-        client_id,
-        client_secret,
-        token_url,
-    );
+    let flow = ClientCredentialsFlow::new(client_id, client_secret, token_url);
 
     // Request a token with optional scopes
     let scopes = ["read", "write"];

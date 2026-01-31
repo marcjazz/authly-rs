@@ -43,7 +43,10 @@ async fn github_callback(
 }
 
 #[get("/auth/logout")]
-async fn github_logout(req: HttpRequest, data: web::Data<AppState>) -> actix_web::Result<impl Responder> {
+async fn github_logout(
+    req: HttpRequest,
+    data: web::Data<AppState>,
+) -> actix_web::Result<impl Responder> {
     logout(
         req,
         data.session_store.clone(),
@@ -55,11 +58,13 @@ async fn github_logout(req: HttpRequest, data: web::Data<AppState>) -> actix_web
 
 #[get("/protected")]
 async fn protected(session: AuthSession) -> impl Responder {
-    let name = session.0.identity
+    let name = session
+        .0
+        .identity
         .username
         .clone()
         .unwrap_or_else(|| "Unknown".to_string());
-    
+
     HttpResponse::Ok().body(format!(
         "Hello, {}! Your ID is {}. You are authenticated via the new AuthSession extractor.",
         name, session.0.identity.external_id
@@ -70,14 +75,16 @@ async fn protected(session: AuthSession) -> impl Responder {
 async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
 
-    let client_id = std::env::var("AUTHLY_GITHUB_CLIENT_ID").expect("AUTHLY_GITHUB_CLIENT_ID must be set");
-    let client_secret = std::env::var("AUTHLY_GITHUB_CLIENT_SECRET").expect("AUTHLY_GITHUB_CLIENT_SECRET must be set");
+    let client_id =
+        std::env::var("AUTHLY_GITHUB_CLIENT_ID").expect("AUTHLY_GITHUB_CLIENT_ID must be set");
+    let client_secret = std::env::var("AUTHLY_GITHUB_CLIENT_SECRET")
+        .expect("AUTHLY_GITHUB_CLIENT_SECRET must be set");
     let redirect_uri = std::env::var("AUTHLY_GITHUB_REDIRECT_URI")
         .unwrap_or_else(|_| "http://localhost:8080/auth/github/callback".to_string());
 
     let provider = GithubProvider::new(client_id, client_secret, redirect_uri);
     let github_flow = Arc::new(OAuth2Flow::new(provider));
-    
+
     // For this example, we'll use SQLite for session persistence.
     let db_url = "sqlite::memory:";
     let pool = SqlitePool::connect(db_url)

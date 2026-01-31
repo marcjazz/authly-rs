@@ -33,11 +33,7 @@ pub struct DeviceFlow {
 
 impl DeviceFlow {
     /// Creates a new `DeviceFlow` instance.
-    pub fn new(
-        client_id: String,
-        device_authorization_url: String,
-        token_url: String,
-    ) -> Self {
+    pub fn new(client_id: String, device_authorization_url: String, token_url: String) -> Self {
         Self {
             client_id,
             device_authorization_url,
@@ -59,10 +55,7 @@ impl DeviceFlow {
             .http_client
             .post(&self.device_authorization_url)
             .header("Accept", "application/json")
-            .form(&[
-                ("client_id", &self.client_id),
-                ("scope", &scope_param),
-            ])
+            .form(&[("client_id", &self.client_id), ("scope", &scope_param)])
             .send()
             .await
             .map_err(|_| AuthError::Network)?;
@@ -78,7 +71,12 @@ impl DeviceFlow {
         response
             .json::<DeviceAuthorizationResponse>()
             .await
-            .map_err(|e| AuthError::Provider(format!("Failed to parse device authorization response: {}", e)))
+            .map_err(|e| {
+                AuthError::Provider(format!(
+                    "Failed to parse device authorization response: {}",
+                    e
+                ))
+            })
     }
 
     /// Polls the token endpoint until an access token is granted or an error occurs.
@@ -99,25 +97,27 @@ impl DeviceFlow {
                 .form(&[
                     ("client_id", &self.client_id),
                     ("device_code", &device_code.to_string()),
-                    ("grant_type", &"urn:ietf:params:oauth:grant-type:device_code".to_string()),
+                    (
+                        "grant_type",
+                        &"urn:ietf:params:oauth:grant-type:device_code".to_string(),
+                    ),
                 ])
                 .send()
                 .await
                 .map_err(|_| AuthError::Network)?;
 
             let status = response.status();
-            
+
             if status.is_success() {
-                return response
-                    .json::<OAuthToken>()
-                    .await
-                    .map_err(|e| AuthError::Provider(format!("Failed to parse token response: {}", e)));
+                return response.json::<OAuthToken>().await.map_err(|e| {
+                    AuthError::Provider(format!("Failed to parse token response: {}", e))
+                });
             } else {
                 let error_resp: serde_json::Value = response
                     .json()
                     .await
                     .map_err(|_| AuthError::Provider("Failed to parse error response".into()))?;
-                
+
                 let error = error_resp["error"].as_str().unwrap_or("unknown_error");
 
                 match error {
@@ -134,7 +134,10 @@ impl DeviceFlow {
                         return Err(AuthError::Provider("Device code expired".into()));
                     }
                     _ => {
-                        return Err(AuthError::Provider(format!("Token polling failed: {}", error)));
+                        return Err(AuthError::Provider(format!(
+                            "Token polling failed: {}",
+                            error
+                        )));
                     }
                 }
             }

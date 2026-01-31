@@ -146,7 +146,11 @@ async fn github_login(State(state): State<AppState>, cookies: Cookies) -> Respon
     if let Some(flow) = &state.github_flow {
         initiate_oauth_login(flow, &cookies, &["user:email"]).into_response()
     } else {
-        (axum::http::StatusCode::NOT_IMPLEMENTED, "GitHub not configured").into_response()
+        (
+            axum::http::StatusCode::NOT_IMPLEMENTED,
+            "GitHub not configured",
+        )
+            .into_response()
     }
 }
 
@@ -167,7 +171,11 @@ async fn github_callback(
         .await
         .into_response()
     } else {
-        (axum::http::StatusCode::NOT_IMPLEMENTED, "GitHub not configured").into_response()
+        (
+            axum::http::StatusCode::NOT_IMPLEMENTED,
+            "GitHub not configured",
+        )
+            .into_response()
     }
 }
 
@@ -176,7 +184,11 @@ async fn google_login(State(state): State<AppState>, cookies: Cookies) -> Respon
     if let Some(flow) = &state.google_flow {
         initiate_oauth_login(flow, &cookies, &["openid", "email", "profile"]).into_response()
     } else {
-        (axum::http::StatusCode::NOT_IMPLEMENTED, "Google not configured").into_response()
+        (
+            axum::http::StatusCode::NOT_IMPLEMENTED,
+            "Google not configured",
+        )
+            .into_response()
     }
 }
 
@@ -197,7 +209,11 @@ async fn google_callback(
         .await
         .into_response()
     } else {
-        (axum::http::StatusCode::NOT_IMPLEMENTED, "Google not configured").into_response()
+        (
+            axum::http::StatusCode::NOT_IMPLEMENTED,
+            "Google not configured",
+        )
+            .into_response()
     }
 }
 
@@ -206,7 +222,11 @@ async fn discord_login(State(state): State<AppState>, cookies: Cookies) -> Respo
     if let Some(flow) = &state.discord_flow {
         initiate_oauth_login(flow, &cookies, &["identify", "email"]).into_response()
     } else {
-        (axum::http::StatusCode::NOT_IMPLEMENTED, "Discord not configured").into_response()
+        (
+            axum::http::StatusCode::NOT_IMPLEMENTED,
+            "Discord not configured",
+        )
+            .into_response()
     }
 }
 
@@ -227,7 +247,11 @@ async fn discord_callback(
         .await
         .into_response()
     } else {
-        (axum::http::StatusCode::NOT_IMPLEMENTED, "Discord not configured").into_response()
+        (
+            axum::http::StatusCode::NOT_IMPLEMENTED,
+            "Discord not configured",
+        )
+            .into_response()
     }
 }
 
