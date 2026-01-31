@@ -1,4 +1,4 @@
-# Authly README
+# Authly
 
 # Authly: Explicit, Modular Authentication for Rust
 
