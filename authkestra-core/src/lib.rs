@@ -1,23 +1,49 @@
+//! # Authkestra Core
+//!
+//! `authkestra-core` provides the foundational traits and types for the Authkestra authentication framework.
+//! It defines the core abstractions for identities, sessions, and providers that are used across the entire ecosystem.
+//!
+//! ## Key Components
+//!
+//! - **[`Identity`]**: A unified structure representing a user's identity across different providers.
+//! - **[`SessionStore`]**: A trait for implementing session persistence (e.g., in-memory, Redis, SQL).
+//! - **[`OAuthProvider`]**: A trait for implementing OAuth2 and OpenID Connect providers.
+//! - **[`AuthError`]**: A comprehensive error type for authentication-related issues.
+
+#![warn(missing_docs)]
+
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// PKCE (Proof Key for Code Exchange) utilities.
 pub mod pkce;
 
+/// Controls whether a cookie is sent with cross-site requests.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SameSite {
+    /// The cookie is sent with "safe" cross-site requests (e.g., following a link).
     Lax,
+    /// The cookie is only sent for same-site requests.
     Strict,
+    /// The cookie is sent with all requests, including cross-site. Requires `Secure`.
     None,
 }
 
+/// Configuration for session cookies.
 #[derive(Clone, Debug)]
 pub struct SessionConfig {
+    /// The name of the session cookie.
     pub cookie_name: String,
+    /// Whether the cookie should only be sent over HTTPS.
     pub secure: bool,
+    /// Whether the cookie should be inaccessible to client-side scripts.
     pub http_only: bool,
+    /// The `SameSite` attribute for the cookie.
     pub same_site: SameSite,
+    /// The path for which the cookie is valid.
     pub path: String,
+    /// The maximum age of the session.
     pub max_age: Option<chrono::Duration>,
 }
 
@@ -34,17 +60,25 @@ impl Default for SessionConfig {
     }
 }
 
+/// Represents an active user session.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Session {
+    /// Unique session identifier.
     pub id: String,
+    /// The identity associated with this session.
     pub identity: Identity,
+    /// When the session expires.
     pub expires_at: chrono::DateTime<chrono::Utc>,
 }
 
+/// Trait for implementing session persistence.
 #[async_trait]
 pub trait SessionStore: Send + Sync + 'static {
+    /// Load a session by its ID.
     async fn load_session(&self, id: &str) -> Result<Option<Session>, AuthError>;
+    /// Save or update a session.
     async fn save_session(&self, session: &Session) -> Result<(), AuthError>;
+    /// Delete a session by its ID.
     async fn delete_session(&self, id: &str) -> Result<(), AuthError>;
 }
 
@@ -145,6 +179,7 @@ pub trait OAuthProvider: Send + Sync {
 /// Trait for a Credentials-based provider (e.g., Email/Password).
 #[async_trait]
 pub trait CredentialsProvider: Send + Sync {
+    /// The type of credentials accepted by this provider.
     type Credentials;
 
     /// Validate credentials and return an Identity.
@@ -154,6 +189,7 @@ pub trait CredentialsProvider: Send + Sync {
 /// Trait for mapping a provider identity to a local user.
 #[async_trait]
 pub trait UserMapper: Send + Sync {
+    /// The type of the local user object.
     type LocalUser: Send + Sync;
 
     /// Map an identity to a local user.
@@ -169,12 +205,17 @@ impl UserMapper for () {
     }
 }
 
+/// An in-memory implementation of [`SessionStore`].
+///
+/// **Note**: This store is not persistent and will be cleared when the application restarts.
+/// It is primarily intended for development and testing.
 #[derive(Default)]
 pub struct MemoryStore {
     sessions: std::sync::Mutex<HashMap<String, Session>>,
 }
 
 impl MemoryStore {
+    /// Create a new, empty `MemoryStore`.
     pub fn new() -> Self {
         Self::default()
     }
