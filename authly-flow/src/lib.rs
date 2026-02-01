@@ -1,6 +1,11 @@
+use async_trait::async_trait;
 use authly_core::{
-    AuthError, CredentialsProvider, Identity, OAuthProvider, OAuthToken, UserMapper,
+    AuthError, CredentialsProvider, Identity, OAuthProvider, OAuthToken, SessionConfig,
+    SessionStore, UserMapper,
 };
+use authly_token::TokenManager;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub mod client_credentials_flow;
 pub mod device_flow;
@@ -9,9 +14,46 @@ pub use client_credentials_flow::ClientCredentialsFlow;
 pub use device_flow::{DeviceAuthorizationResponse, DeviceFlow};
 
 /// Orchestrates the Authorization Code flow.
+#[async_trait]
+pub trait ErasedOAuthFlow: Send + Sync {
+    fn provider_id(&self) -> String;
+    fn initiate_login(&self, scopes: &[&str], pkce_challenge: Option<&str>) -> (String, String);
+    async fn finalize_login(
+        &self,
+        code: &str,
+        received_state: &str,
+        expected_state: &str,
+        pkce_verifier: Option<&str>,
+    ) -> Result<(authly_core::Identity, authly_core::OAuthToken), authly_core::AuthError>;
+}
+
 pub struct OAuth2Flow<P: OAuthProvider, M: UserMapper = ()> {
     provider: P,
     mapper: Option<M>,
+}
+
+#[async_trait]
+impl<P: OAuthProvider, M: UserMapper> ErasedOAuthFlow for OAuth2Flow<P, M> {
+    fn provider_id(&self) -> String {
+        self.provider.provider_id().to_string()
+    }
+
+    fn initiate_login(&self, scopes: &[&str], pkce_challenge: Option<&str>) -> (String, String) {
+        self.initiate_login(scopes, pkce_challenge)
+    }
+
+    async fn finalize_login(
+        &self,
+        code: &str,
+        received_state: &str,
+        expected_state: &str,
+        pkce_verifier: Option<&str>,
+    ) -> Result<(authly_core::Identity, authly_core::OAuthToken), authly_core::AuthError> {
+        let (identity, token, _) = self
+            .finalize_login(code, received_state, expected_state, pkce_verifier)
+            .await?;
+        Ok((identity, token))
+    }
 }
 
 impl<P: OAuthProvider> OAuth2Flow<P, ()> {
@@ -78,6 +120,79 @@ impl<P: OAuthProvider, M: UserMapper> OAuth2Flow<P, M> {
     /// Revoke an access token.
     pub async fn revoke_token(&self, token: &str) -> Result<(), AuthError> {
         self.provider.revoke_token(token).await
+    }
+}
+
+/// The unified Authly service.
+#[derive(Clone)]
+pub struct Authly {
+    pub providers: HashMap<String, Arc<dyn ErasedOAuthFlow>>,
+    pub session_store: Arc<dyn SessionStore>,
+    pub session_config: SessionConfig,
+    pub token_manager: Arc<TokenManager>,
+}
+
+impl Authly {
+    pub fn builder() -> AuthlyBuilder {
+        AuthlyBuilder::default()
+    }
+}
+
+pub struct AuthlyBuilder {
+    providers: HashMap<String, Arc<dyn ErasedOAuthFlow>>,
+    session_store: Option<Arc<dyn SessionStore>>,
+    session_config: SessionConfig,
+    token_manager: Option<Arc<TokenManager>>,
+}
+
+impl Default for AuthlyBuilder {
+    fn default() -> Self {
+        Self {
+            providers: HashMap::new(),
+            session_store: None,
+            session_config: SessionConfig::default(),
+            token_manager: None,
+        }
+    }
+}
+
+impl AuthlyBuilder {
+    pub fn provider<P, M>(mut self, flow: OAuth2Flow<P, M>) -> Self
+    where
+        P: OAuthProvider + 'static,
+        M: UserMapper + 'static,
+    {
+        let id = flow.provider_id();
+        self.providers.insert(id, Arc::new(flow));
+        self
+    }
+
+    pub fn session_store(mut self, store: Arc<dyn SessionStore>) -> Self {
+        self.session_store = Some(store);
+        self
+    }
+
+    pub fn session_config(mut self, config: SessionConfig) -> Self {
+        self.session_config = config;
+        self
+    }
+
+    pub fn token_manager(mut self, manager: Arc<TokenManager>) -> Self {
+        self.token_manager = Some(manager);
+        self
+    }
+
+    pub fn build(self) -> Authly {
+        Authly {
+            providers: self.providers,
+            session_store: self
+                .session_store
+                .unwrap_or_else(|| Arc::new(authly_core::MemoryStore::default())), // Wait, MemoryStore is in authly-session!
+            session_config: self.session_config,
+            token_manager: self
+                .token_manager
+                .unwrap_or_else(|| Arc::new(TokenManager::new(b"secret", None))),
+        }
     }
 }
 

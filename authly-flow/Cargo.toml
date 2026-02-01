@@ -10,6 +10,8 @@ categories = ["authentication"]
 
 [dependencies]
 authly-core = { version = "0.1.0", path = "../authly-core" }
+async-trait = "0.1"
+authly-token = { version = "0.1.0", path = "../authly-token" }
 serde = { version = "1.0", features = ["derive"] }
 reqwest = { version = "0.13.1", features = ["json", "form"] }
 serde_json = "1.0"
