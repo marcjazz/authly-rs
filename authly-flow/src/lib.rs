@@ -138,22 +138,12 @@ impl Authly {
     }
 }
 
+#[derive(Default)]
 pub struct AuthlyBuilder {
     providers: HashMap<String, Arc<dyn ErasedOAuthFlow>>,
     session_store: Option<Arc<dyn SessionStore>>,
     session_config: SessionConfig,
     token_manager: Option<Arc<TokenManager>>,
-}
-
-impl Default for AuthlyBuilder {
-    fn default() -> Self {
-        Self {
-            providers: HashMap::new(),
-            session_store: None,
-            session_config: SessionConfig::default(),
-            token_manager: None,
-        }
-    }
 }
 
 impl AuthlyBuilder {

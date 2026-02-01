@@ -1,5 +1,5 @@
-use authly_core::{pkce::Pkce, Identity, OAuthProvider, OAuthToken, Session, SessionStore};
 pub use authly_core::SessionConfig;
+use authly_core::{pkce::Pkce, Identity, OAuthProvider, OAuthToken, Session, SessionStore};
 use authly_flow::{Authly, ErasedOAuthFlow, OAuth2Flow};
 use authly_token::TokenManager;
 use axum::{
@@ -328,7 +328,7 @@ where
         .map(|c| c.value().to_string())
         .unwrap_or_else(|| "/".to_string());
 
-    if let Some(cookie) = cookies.get(&success_url_cookie_name) {
+    if let Some(_cookie) = cookies.get(&success_url_cookie_name) {
         let mut remove_cookie = Cookie::new(success_url_cookie_name, "");
         remove_cookie.set_path("/");
         remove_cookie.set_secure(session_config.secure);
@@ -347,10 +347,7 @@ where
     .into_response()
 }
 
-pub async fn axum_logout_handler<S>(
-    State(state): State<S>,
-    cookies: Cookies,
-) -> impl IntoResponse
+pub async fn axum_logout_handler<S>(State(state): State<S>, cookies: Cookies) -> impl IntoResponse
 where
     S: Clone + Send + Sync + 'static,
     SessionConfig: axum::extract::FromRef<S>,

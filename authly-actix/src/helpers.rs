@@ -1,6 +1,6 @@
 use actix_web::{cookie::Cookie, http::header, web, HttpRequest, HttpResponse};
-use authly_core::{pkce::Pkce, OAuthProvider, Session, SessionStore, SessionConfig};
-use authly_flow::{Authly, OAuth2Flow, ErasedOAuthFlow};
+use authly_core::{pkce::Pkce, OAuthProvider, Session, SessionConfig, SessionStore};
+use authly_flow::{Authly, ErasedOAuthFlow, OAuth2Flow};
 use std::sync::Arc;
 
 #[derive(serde::Deserialize)]
@@ -180,7 +180,9 @@ pub async fn actix_callback_handler(
     let provider = path.into_inner();
     let flow = match authly.providers.get(&provider) {
         Some(f) => f,
-        None => return Ok(HttpResponse::NotFound().body(format!("Provider {} not found", provider))),
+        None => {
+            return Ok(HttpResponse::NotFound().body(format!("Provider {} not found", provider)))
+        }
     };
 
     handle_oauth_callback_erased(

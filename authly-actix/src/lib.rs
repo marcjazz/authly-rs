@@ -1,5 +1,5 @@
 use actix_web::{dev::Payload, http::header, web, Error, FromRequest, HttpRequest};
-use authly_core::{Session, SessionStore, SessionConfig};
+use authly_core::{Session, SessionConfig, SessionStore};
 use authly_flow::Authly;
 use authly_token::TokenManager;
 use futures::future::LocalBoxFuture;
@@ -16,7 +16,10 @@ impl AuthlyActixExt for Authly {
     fn actix_scope(&self) -> actix_web::Scope {
         web::scope("/auth")
             .route("/{provider}", web::get().to(actix_login_handler))
-            .route("/{provider}/callback", web::get().to(actix_callback_handler))
+            .route(
+                "/{provider}/callback",
+                web::get().to(actix_callback_handler),
+            )
             .route("/logout", web::get().to(actix_logout_handler))
     }
 }

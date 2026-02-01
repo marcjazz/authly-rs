@@ -1,8 +1,4 @@
-use async_trait::async_trait;
 pub use authly_core::{AuthError, Identity, Session, SessionStore};
-
-use std::collections::HashMap;
-use std::sync::Mutex;
 
 #[cfg(feature = "store-sqlx")]
 pub mod sql_store;
@@ -20,6 +16,8 @@ pub use authly_core::MemoryStore;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[tokio::test]
