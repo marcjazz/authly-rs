@@ -20,16 +20,16 @@ jobs:
       fail-fast: false
       matrix:
         crate:
-          - "authly-core"
-          - "authly-token"
-          - "authly-session"
-          - "authly-oidc"
-          - "authly-flow"
-          - "authly-providers-discord"
-          - "authly-providers-github"
-          - "authly-providers-google"
-          - "authly-actix"
-          - "authly-axum"
+          - "authkestra-core"
+          - "authkestra-token"
+          - "authkestra-session"
+          - "authkestra-oidc"
+          - "authkestra-flow"
+          - "authkestra-providers-discord"
+          - "authkestra-providers-github"
+          - "authkestra-providers-google"
+          - "authkestra-actix"
+          - "authkestra-axum"
 
     steps:
       - name: Checkout repository
