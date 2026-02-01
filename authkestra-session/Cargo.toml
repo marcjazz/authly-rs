@@ -1,0 +1,29 @@
+[package]
+name = "authkestra-session"
+version = "0.1.0"
+edition = "2021"
+description = "Session management and persistence for the authkestra framework"
+repository = "https://github.com/marcjazz/authkestra-rs"
+license = "MIT OR Apache-2.0"
+keywords = ["auth", "session", "redis", "sqlx"]
+categories = ["authentication", "web-programming"]
+
+[features]
+default = []
+store-redis = ["dep:redis"]
+store-sqlx = ["dep:sqlx"]
+postgres = ["store-sqlx", "sqlx/postgres", "sqlx/runtime-tokio-rustls"]
+mysql = ["store-sqlx", "sqlx/mysql", "sqlx/runtime-tokio-rustls"]
+sqlite = ["store-sqlx", "sqlx/sqlite", "sqlx/runtime-tokio-rustls"]
+
+[dependencies]
+authkestra-core = { version = "0.1.0", path = "../authkestra-core" }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+redis = { version = "1.0.3", features = ["tokio-comp"], optional = true }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "chrono", "macros"], default-features = false, optional = true }
+serde_json = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["full"] }
