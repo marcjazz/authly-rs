@@ -53,7 +53,7 @@ Thank you for your interest in contributing to Authkestra! We welcome contributi
     cargo test --workspace
     ```
 
-5. **Submit a Pull Request**: Push your branch to your fork and submit a pull request to the `master` branch of the main repository.
+5. **Submit a Pull Request**: Push your branch to your fork and submit a pull request to the `main` branch of the main repository.
 
 ## Documentation
 
