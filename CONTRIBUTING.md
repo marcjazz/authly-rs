@@ -14,8 +14,8 @@ Thank you for your interest in contributing to Authkestra! We welcome contributi
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/your-username/authkestra-rs.git
-    cd authkestra-rs
+    git clone https://github.com/your-username/authkestra.git
+    cd authkestra
     ```
 
 2. Run the dependencies using Docker Compose:
