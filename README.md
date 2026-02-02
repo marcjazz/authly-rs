@@ -2,7 +2,19 @@
 
 `authkestra` is a modular, framework-agnostic authentication orchestration system designed to be idiomatic to Rust, emphasizing **explicit control flow, strong typing, and composability** over dynamic middleware strategies common in other ecosystems.
 
-This repository provides a workspace for the core components, focusing initially on OAuth2/OIDC with Axum and Actix integration.
+## 📦 Getting Started
+
+The easiest way to use Authkestra is via the `authkestra` facade crate. It re-exports all sub-crates behind feature flags, allowing you to manage your authentication stack from a single dependency.
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+# Use the facade with the features you need
+authkestra = { version = "0.1.0", features = ["axum", "github"] }
+```
+
+For advanced users, individual crates are still available and can be used independently if preferred.
 
 ## 🚀 Features
 
@@ -16,6 +28,7 @@ This repository provides a workspace for the core components, focusing initially
 
 | Crate                                                                    | Responsibility                                                            |
 | :----------------------------------------------------------------------- | :------------------------------------------------------------------------ |
+| [`authkestra`](authkestra/README.md)                                     | **Primary Facade**: Re-exports all other crates behind features.          |
 | [`authkestra-core`](authkestra-core/README.md)                           | Foundational types, traits (`Identity`, `OAuthProvider`, `SessionStore`). |
 | [`authkestra-flow`](authkestra-flow/README.md)                           | Orchestrates OAuth2/OIDC flows (Authorization Code, PKCE).                |
 | [`authkestra-session`](authkestra-session/README.md)                     | Session persistence layer abstraction.                                    |
@@ -31,6 +44,7 @@ This repository provides a workspace for the core components, focusing initially
 
 To see Authkestra in action, check out the [examples](examples/) directory:
 
+- [Get Started](examples/get_started.rs)
 - [Axum with GitHub OAuth](examples/axum_oauth.rs)
 - [Actix with GitHub OAuth](examples/actix_github.rs)
 - [OIDC Generic Provider](examples/oidc_generic.rs)

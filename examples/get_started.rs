@@ -42,8 +42,8 @@ async fn main() {
         .layer(CookieManagerLayer::new())
         .with_state(state);
 
-    println!("Authkestra Facade Demo running on http://localhost:3000");
-    println!("This demo uses the 'authkestra' facade crate instead of individual sub-crates.");
+    println!("Authkestra Demo running on http://localhost:3000");
+    println!("This demo uses the 'authkestra' crate instead of individual sub-crates.");
     
     // We won't actually start the server in a non-interactive environment if we want to just verify compilation
     // but for a real example file, this is what it would look like.
@@ -53,8 +53,8 @@ async fn main() {
 
 async fn index() -> impl IntoResponse {
     Html(r#"
-        <h1>Authkestra Facade Demo</h1>
-        <p>This example demonstrates using the <code>authkestra</code> facade crate.</p>
+        <h1>Authkestra Demo</h1>
+        <p>This example demonstrates using the <code>authkestra</code> crate.</p>
         <ul>
             <li><a href="/auth/github?success_url=/protected">Login with GitHub</a></li>
         </ul>
