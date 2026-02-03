@@ -314,9 +314,6 @@ dependencies = [
  "authkestra-providers-google",
  "authkestra-session",
  "authkestra-token",
- "axum",
- "tokio",
- "tower-cookies",
 ]
 
 [[package]]
@@ -342,23 +339,14 @@ dependencies = [
 name = "authkestra-axum"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "authkestra-core",
  "authkestra-flow",
- "authkestra-oidc",
- "authkestra-providers-discord",
- "authkestra-providers-github",
- "authkestra-providers-google",
  "authkestra-session",
  "authkestra-token",
  "axum",
- "axum-extra",
  "chrono",
- "dotenvy",
  "serde",
  "serde_json",
- "sqlx",
- "tokio",
  "tower-cookies",
  "uuid",
 ]
@@ -374,6 +362,35 @@ dependencies = [
  "serde",
  "sha2",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "authkestra-examples"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "async-trait",
+ "authkestra",
+ "authkestra-actix",
+ "authkestra-axum",
+ "authkestra-core",
+ "authkestra-flow",
+ "authkestra-oidc",
+ "authkestra-providers-discord",
+ "authkestra-providers-github",
+ "authkestra-providers-google",
+ "authkestra-session",
+ "authkestra-token",
+ "axum",
+ "chrono",
+ "dotenvy",
+ "jsonwebtoken",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tower-cookies",
+ "uuid",
 ]
 
 [[package]]
@@ -553,28 +570,6 @@ dependencies = [
  "mime",
  "pin-project-lite",
  "sync_wrapper",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "axum-extra"
-version = "0.12.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fef252edff26ddba56bbcdf2ee3307b8129acb86f5749b68990c168a6fcc9c76"
-dependencies = [
- "axum",
- "axum-core",
- "bytes",
- "cookie 0.18.1",
- "futures-core",
- "futures-util",
- "http 1.4.0",
- "http-body",
- "http-body-util",
- "mime",
- "pin-project-lite",
  "tower-layer",
  "tower-service",
  "tracing",

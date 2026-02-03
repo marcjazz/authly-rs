@@ -3,6 +3,7 @@ use authkestra_core::{
     AuthError, CredentialsProvider, Identity, Session, SessionStore, UserMapper,
 };
 use authkestra_flow::CredentialsFlow;
+use async_trait::async_trait;
 use axum::{
     extract::{Form, State},
     response::{IntoResponse, Redirect},
@@ -24,7 +25,7 @@ pub struct LoginCredentials {
 // 2. Implement a Mock CredentialsProvider
 pub struct MyCredentialsProvider;
 
-#[async_trait::async_trait]
+#[async_trait]
 impl CredentialsProvider for MyCredentialsProvider {
     type Credentials = LoginCredentials;
 
@@ -56,7 +57,7 @@ pub struct SqlxUserMapper {
     // pool: sqlx::PgPool
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl UserMapper for SqlxUserMapper {
     type LocalUser = LocalUser;
 

@@ -1,0 +1,31 @@
+[package]
+name = "authkestra-examples"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+authkestra = { path = "../authkestra", features = ["full"] }
+authkestra-core = { path = "../authkestra-core" }
+authkestra-flow = { path = "../authkestra-flow" }
+authkestra-session = { path = "../authkestra-session", features = ["sqlite", "store-redis"] }
+authkestra-token = { path = "../authkestra-token" }
+authkestra-oidc = { path = "../authkestra-oidc" }
+authkestra-axum = { path = "../authkestra-axum" }
+authkestra-actix = { path = "../authkestra-actix" }
+authkestra-providers-github = { path = "../authkestra-providers-github" }
+authkestra-providers-google = { path = "../authkestra-providers-google" }
+authkestra-providers-discord = { path = "../authkestra-providers-discord" }
+
+axum = "0.8.8"
+actix-web = "4"
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+jsonwebtoken = "10.3.0"
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+tower-cookies = "0.11.0"
+dotenvy = "0.15"
+async-trait = "0.1"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }

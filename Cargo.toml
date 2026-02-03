@@ -10,4 +10,5 @@ members = [
     "authkestra-providers-discord",
     "authkestra-axum", "authkestra-oidc", "authkestra-actix",
     "authkestra",
+    "authkestra-examples",
 ]
