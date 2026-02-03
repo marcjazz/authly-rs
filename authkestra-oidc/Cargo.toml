@@ -1,6 +1,6 @@
 [package]
 name = "authkestra-oidc"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "OpenID Connect (OIDC) implementation for the authkestra framework"
 repository = "https://github.com/marcjazz/authkestra"
@@ -13,7 +13,7 @@ authkestra-core = { version = "0.1.0", path = "../authkestra-core" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.13.1", features = ["json", "form"] }
-jsonwebtoken = "10.3.0"
+jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 thiserror = "2.0.18"
 async-trait = "0.1"
 url = "2.5"

@@ -1,3 +1,16 @@
+//! # Axum OAuth Example
+//!
+//! This example demonstrates how to set up Authkestra with Axum to support multiple OAuth2 providers
+//! (GitHub, Google, Discord) and session management.
+//!
+//! To run this example, you'll need to set the following environment variables in a `.env` file:
+//! - `AUTHKESTRA_GITHUB_CLIENT_ID`
+//! - `AUTHKESTRA_GITHUB_CLIENT_SECRET`
+//! - `AUTHKESTRA_GOOGLE_CLIENT_ID`
+//! - `AUTHKESTRA_GOOGLE_CLIENT_SECRET`
+//! - `AUTHKESTRA_DISCORD_CLIENT_ID`
+//! - `AUTHKESTRA_DISCORD_CLIENT_SECRET`
+
 use authkestra_axum::{AuthSession, Authkestra, AuthkestraAxumExt, AuthkestraState, SessionConfig};
 use authkestra_flow::OAuth2Flow;
 use authkestra_providers_discord::DiscordProvider;
@@ -15,6 +28,7 @@ use tower_cookies::CookieManagerLayer;
 
 #[tokio::main]
 async fn main() {
+    // Load environment variables from .env file
     dotenvy::dotenv().ok();
 
     let mut builder = Authkestra::builder();
@@ -81,10 +95,11 @@ async fn main() {
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    println!("Listening on http://0.0.0.0:3000");
+    println!("🚀 Axum OAuth Example running on http://localhost:3000");
     axum::serve(listener, app).await.unwrap();
 }
 
+/// The home page showing login options based on configured providers.
 async fn index(State(state): State<AuthkestraState>) -> impl IntoResponse {
     let mut html = String::from("<h1>Welcome to Authkestra Axum OAuth Example</h1><ul>");
     if state.authkestra.providers.contains_key("github") {

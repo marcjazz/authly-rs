@@ -1,6 +1,6 @@
 [package]
 name = "authkestra-flow"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "OAuth2 and OIDC flow orchestration for the authkestra framework"
 repository = "https://github.com/marcjazz/authkestra"
@@ -19,11 +19,3 @@ uuid = { version = "1.0", features = ["v4"] }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
-
-[[example]]
-name = "device_flow"
-path = "../examples/device_flow.rs"
-
-[[example]]
-name = "client_credentials_flow"
-path = "../examples/client_credentials_flow.rs"

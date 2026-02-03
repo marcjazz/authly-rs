@@ -14,6 +14,7 @@ authkestra-session = { version = "0.1.0", path = "../authkestra-session" }
 authkestra-flow = { version = "0.1.0", path = "../authkestra-flow" }
 authkestra-token = { version = "0.1.0", path = "../authkestra-token" }
 axum = "0.8.8"
+jsonwebtoken = "10.3.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tower-cookies = "0.11.0"

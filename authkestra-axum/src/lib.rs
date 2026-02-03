@@ -92,6 +92,47 @@ where
     }
 }
 
+/// A generic JWT extractor for resource server validation.
+///
+/// Validates a Bearer token against a configured `JwksCache` and `jsonwebtoken::Validation`.
+pub struct Jwt<T>(pub T);
+
+impl<S, T> FromRequestParts<S> for Jwt<T>
+where
+    S: Send + Sync,
+    Arc<authkestra_token::offline_validation::JwksCache>: FromRef<S>,
+    jsonwebtoken::Validation: FromRef<S>,
+    T: for<'de> serde::Deserialize<'de> + 'static,
+{
+    type Rejection = AuthkestraAxumError;
+
+    async fn from_request_parts(parts: &mut axum::http::request::Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let cache = Arc::<authkestra_token::offline_validation::JwksCache>::from_ref(state);
+        let validation = jsonwebtoken::Validation::from_ref(state);
+
+        let auth_header = parts
+            .headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|h| h.to_str().ok())
+            .ok_or_else(|| AuthkestraAxumError::Unauthorized("Missing Authorization header".to_string()))?;
+
+        if !auth_header.starts_with("Bearer ") {
+            return Err(AuthkestraAxumError::Unauthorized("Invalid Authorization header".to_string()));
+        }
+
+        let token = &auth_header[7..];
+        let claims = authkestra_token::offline_validation::validate_jwt_generic::<T>(
+            token,
+            &cache,
+            &validation,
+        )
+        .await
+        .map_err(|e| AuthkestraAxumError::Unauthorized(format!("Invalid token: {}", e)))?;
+
+        Ok(Jwt(claims))
+    }
+}
+
 pub trait AuthkestraAxumExt {
     fn axum_router<S>(&self) -> axum::Router<S>
     where

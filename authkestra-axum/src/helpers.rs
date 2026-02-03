@@ -4,7 +4,7 @@ use authkestra_flow::{Authkestra, ErasedOAuthFlow, OAuth2Flow};
 use authkestra_token::TokenManager;
 use axum::{
     extract::{FromRef, Path, Query, State},
-    http::{request::Parts, StatusCode},
+    http::StatusCode,
     response::{IntoResponse, Redirect},
     Json,
 };
@@ -272,7 +272,9 @@ where
     let session_config = SessionConfig::from_ref(&state);
     let flow: &Arc<dyn ErasedOAuthFlow> = match authkestra.providers.get(&provider) {
         Some(f) => f,
-        None => return (StatusCode::NOT_FOUND, "Provider not found").into_response(),
+        None => {
+            return (StatusCode::NOT_FOUND, "Provider not found").into_response();
+        }
     };
 
     let scopes_str = params.scope.unwrap_or_default();
@@ -322,7 +324,9 @@ where
 
     let flow: &Arc<dyn ErasedOAuthFlow> = match authkestra.providers.get(&provider) {
         Some(f) => f,
-        None => return (StatusCode::NOT_FOUND, "Provider not found").into_response(),
+        None => {
+            return (StatusCode::NOT_FOUND, "Provider not found").into_response();
+        }
     };
 
     let success_url_cookie_name = format!("authkestra_success_{}", params.state);
@@ -398,7 +402,7 @@ pub async fn get_session(
 }
 
 pub async fn get_token(
-    parts: &Parts,
+    parts: &axum::http::request::Parts,
     token_manager: &TokenManager,
 ) -> Result<authkestra_token::Claims, AuthkestraAxumError> {
     let auth_header = parts

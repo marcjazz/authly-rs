@@ -14,12 +14,7 @@ jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
-paseto = "2.0.0"
 reqwest = { version = "0.13.1", features = ["json"] }
 tokio = { version = "1.0", features = ["full"] }
 thiserror = "2.0.18"
 arc-swap = "1.6"
-
-[[example]]
-name = "offline_validation"
-path = "../examples/offline_validation.rs"

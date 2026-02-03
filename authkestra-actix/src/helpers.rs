@@ -165,7 +165,9 @@ pub async fn actix_login_handler(
     let provider = path.into_inner();
     let flow = match authkestra.providers.get(&provider) {
         Some(f) => f,
-        None => return HttpResponse::NotFound().body(format!("Provider {} not found", provider)),
+        None => {
+            return HttpResponse::NotFound().body(format!("Provider {} not found", provider));
+        }
     };
 
     initiate_oauth_login_erased(flow.as_ref(), &authkestra.session_config, &[])
@@ -181,7 +183,7 @@ pub async fn actix_callback_handler(
     let flow = match authkestra.providers.get(&provider) {
         Some(f) => f,
         None => {
-            return Ok(HttpResponse::NotFound().body(format!("Provider {} not found", provider)))
+            return Ok(HttpResponse::NotFound().body(format!("Provider {} not found", provider)));
         }
     };
 
@@ -233,4 +235,78 @@ pub async fn logout(
         .insert_header((header::LOCATION, redirect_to))
         .cookie(remove_cookie)
         .finish())
+}
+
+/// Helper to handle the OAuth2 callback and return a JWT for stateless auth.
+pub async fn handle_oauth_callback_jwt_erased(
+    flow: &dyn ErasedOAuthFlow,
+    req: &HttpRequest,
+    params: OAuthCallbackParams,
+    token_manager: Arc<authkestra_token::TokenManager>,
+    expires_in_secs: u64,
+    config: &SessionConfig,
+) -> Result<HttpResponse, actix_web::Error> {
+    let cookie_name = format!("authkestra_flow_{}", params.state);
+    let pkce_verifier = req
+        .cookie(&cookie_name)
+        .map(|c| c.value().to_string())
+        .ok_or_else(|| {
+            actix_web::error::ErrorUnauthorized("CSRF validation failed or session expired")
+        })?;
+
+    // Exchange code
+    let (identity, _token) = flow
+        .finalize_login(
+            &params.code,
+            &params.state,
+            &params.state,
+            Some(&pkce_verifier),
+        )
+        .await
+        .map_err(|e| {
+            actix_web::error::ErrorUnauthorized(format!("Authentication failed: {}", e))
+        })?;
+
+    let jwt = token_manager
+        .issue_user_token(identity, expires_in_secs, None)
+        .map_err(|e| actix_web::error::ErrorInternalServerError(format!("Token error: {}", e)))?;
+
+    // Remove the flow cookie
+    let remove_cookie = Cookie::build(cookie_name, "")
+        .path("/")
+        .secure(config.secure)
+        .max_age(actix_web::cookie::time::Duration::ZERO)
+        .finish();
+
+    Ok(HttpResponse::Ok()
+        .cookie(remove_cookie)
+        .json(serde_json::json!({
+            "access_token": jwt,
+            "token_type": "Bearer",
+            "expires_in": expires_in_secs
+        })))
+}
+
+/// Helper to handle the OAuth2 callback and return a JWT for stateless auth.
+pub async fn handle_oauth_callback_jwt<P, M>(
+    flow: &OAuth2Flow<P, M>,
+    req: &HttpRequest,
+    params: OAuthCallbackParams,
+    token_manager: Arc<authkestra_token::TokenManager>,
+    expires_in_secs: u64,
+    config: &SessionConfig,
+) -> Result<HttpResponse, actix_web::Error>
+where
+    P: OAuthProvider + Send + Sync,
+    M: authkestra_core::UserMapper + Send + Sync,
+{
+    handle_oauth_callback_jwt_erased(
+        flow,
+        req,
+        params,
+        token_manager,
+        expires_in_secs,
+        config,
+    )
+    .await
 }

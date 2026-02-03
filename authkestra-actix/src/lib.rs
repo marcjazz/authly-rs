@@ -109,3 +109,60 @@ impl FromRequest for AuthToken {
         })
     }
 }
+
+/// A generic JWT extractor for resource server validation.
+///
+/// Validates a Bearer token against a configured `JwksCache` and `jsonwebtoken::Validation`.
+pub struct Jwt<T>(pub T);
+
+impl<T> FromRequest for Jwt<T>
+where
+    T: for<'de> serde::Deserialize<'de> + 'static,
+{
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self, Self::Error>>;
+
+    fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
+        let cache = req
+            .app_data::<web::Data<Arc<authkestra_token::offline_validation::JwksCache>>>()
+            .cloned();
+        let validation = req
+            .app_data::<web::Data<jsonwebtoken::Validation>>()
+            .cloned();
+
+        let auth_header = req
+            .headers()
+            .get(header::AUTHORIZATION)
+            .and_then(|h| h.to_str().ok())
+            .map(|s| s.to_string());
+
+        Box::pin(async move {
+            let cache = cache.ok_or_else(|| {
+                actix_web::error::ErrorInternalServerError("JwksCache not configured")
+            })?;
+            let validation = validation.ok_or_else(|| {
+                actix_web::error::ErrorInternalServerError("jsonwebtoken::Validation not configured")
+            })?;
+            let auth_header = auth_header.ok_or_else(|| {
+                actix_web::error::ErrorUnauthorized("Missing Authorization header")
+            })?;
+
+            if !auth_header.starts_with("Bearer ") {
+                return Err(actix_web::error::ErrorUnauthorized(
+                    "Invalid Authorization header",
+                ));
+            }
+
+            let token = &auth_header[7..];
+            let claims = authkestra_token::offline_validation::validate_jwt_generic::<T>(
+                token,
+                &cache,
+                &validation,
+            )
+            .await
+            .map_err(|e| actix_web::error::ErrorUnauthorized(format!("Invalid token: {}", e)))?;
+
+            Ok(Jwt(claims))
+        })
+    }
+}

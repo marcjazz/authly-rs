@@ -92,6 +92,18 @@ pub async fn validate_jwt(
     cache: &JwksCache,
     validation: &Validation,
 ) -> Result<Claims, ValidationError> {
+    validate_jwt_generic::<Claims>(token, cache, validation).await
+}
+
+/// Validates a JWT against the cached JWKS with generic claims.
+pub async fn validate_jwt_generic<T>(
+    token: &str,
+    cache: &JwksCache,
+    validation: &Validation,
+) -> Result<T, ValidationError>
+where
+    T: for<'de> Deserialize<'de>,
+{
     cache.refresh_if_needed().await?;
 
     let header = decode_header(token)?;
@@ -103,7 +115,7 @@ pub async fn validate_jwt(
     let jwk = jwks.find(&kid).ok_or(ValidationError::KeyNotFound)?;
 
     let decoding_key = DecodingKey::from_jwk(jwk)?;
-    let token_data = decode::<Claims>(token, &decoding_key, validation)?;
+    let token_data = decode::<T>(token, &decoding_key, validation)?;
 
     Ok(token_data.claims)
 }
