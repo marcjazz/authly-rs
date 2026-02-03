@@ -111,9 +111,9 @@ impl AuthkestraAxumExt for Authkestra {
     {
         use axum::routing::get;
         axum::Router::new()
-            .route("/auth/:provider", get(helpers::axum_login_handler::<S>))
+            .route("/auth/{provider}", get(helpers::axum_login_handler::<S>))
             .route(
-                "/auth/:provider/callback",
+                "/auth/{provider}/callback",
                 get(helpers::axum_callback_handler::<S>),
             )
             .route("/auth/logout", get(helpers::axum_logout_handler::<S>))
