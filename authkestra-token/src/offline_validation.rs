@@ -1,5 +1,5 @@
-use authkestra_core::{AuthError, ProviderMetadata};
-use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
+use authkestra_core::AuthError;
+use jsonwebtoken::{decode, decode_header, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use thiserror::Error;
@@ -72,7 +72,8 @@ pub struct Jwks {
 }
 
 impl Jwks {
-    pub async fn fetch(jwks_uri: &str, client: &reqwest::Client) -> Result<Self, ValidationError> {
+    pub async fn fetch(jwks_uri: &str) -> Result<Self, ValidationError> {
+        let client = reqwest::Client::new();
         let jwks = client.get(jwks_uri).send().await?.json::<Jwks>().await?;
         Ok(jwks)
     }
@@ -87,18 +88,16 @@ impl Jwks {
 
 pub struct JwksCache {
     jwks_uri: String,
-    http_client: reqwest::Client,
     jwks: RwLock<Option<(Jwks, Instant)>>,
     ttl: Duration,
 }
 
 impl JwksCache {
-    pub fn new(jwks_uri: String, http_client: reqwest::Client) -> Self {
+    pub fn new(jwks_uri: String, refresh_interval: Duration) -> Self {
         Self {
             jwks_uri,
-            http_client,
             jwks: RwLock::new(None),
-            ttl: Duration::from_secs(3600), // 1 hour default TTL
+            ttl: refresh_interval,
         }
     }
 
@@ -128,64 +127,9 @@ impl JwksCache {
 
     pub async fn refresh(&self) -> Result<Jwks, ValidationError> {
         let mut write_guard = self.jwks.write().await;
-        let jwks = Jwks::fetch(&self.jwks_uri, &self.http_client).await?;
+        let jwks = Jwks::fetch(&self.jwks_uri).await?;
         *write_guard = Some((jwks.clone(), Instant::now()));
         Ok(jwks)
-    }
-}
-
-pub struct OidcValidator {
-    metadata: ProviderMetadata,
-    jwks_cache: JwksCache,
-}
-
-impl OidcValidator {
-    /// Creates a new validator by performing discovery.
-    /// This is suitable for offline validation where client credentials are not required.
-    pub async fn discover(issuer_url: &str) -> Result<Self, ValidationError> {
-        let client = reqwest::Client::new();
-        let metadata = ProviderMetadata::discover(issuer_url, &client).await?;
-        let jwks_cache = JwksCache::new(metadata.jwks_uri.clone(), client.clone());
-        Ok(Self {
-            metadata,
-            jwks_cache,
-        })
-    }
-
-    pub async fn validate_id_token<T>(
-        &self,
-        id_token: &str,
-        audience: &str,
-    ) -> Result<T, ValidationError>
-    where
-        T: for<'de> Deserialize<'de>,
-    {
-        let header = decode_header(id_token)
-            .map_err(|e| ValidationError::Validation(format!("Invalid ID Token header: {}", e)))?;
-
-        let jwk = self
-            .jwks_cache
-            .get_key(header.kid.as_deref())
-            .await?
-            .ok_or_else(|| {
-                ValidationError::Validation("No matching key found in JWKS".to_string())
-            })?;
-
-        let decoding_key = jwk.to_decoding_key()?;
-
-        let mut validation = Validation::new(Algorithm::RS256);
-        validation.set_issuer(std::slice::from_ref(&self.metadata.issuer));
-        validation.set_audience(std::slice::from_ref(&audience));
-
-        let token_data = decode::<T>(id_token, &decoding_key, &validation).map_err(|e| {
-            ValidationError::Validation(format!("ID Token validation failed: {}", e))
-        })?;
-
-        Ok(token_data.claims)
-    }
-
-    pub fn metadata(&self) -> &ProviderMetadata {
-        &self.metadata
     }
 }
 
