@@ -70,17 +70,15 @@ impl DeviceFlow {
 
         let response_text = response.text().await.map_err(|e| {
             AuthError::Provider(format!(
-                "Failed to read device authorization response body: {}",
-                e
+                "Failed to read device authorization response body: {e}"
             ))
         })?;
 
-        println!("Raw device authorization response body: {}", response_text);
+        println!("Raw device authorization response body: {response_text}");
 
         serde_json::from_str::<DeviceAuthorizationResponse>(&response_text).map_err(|e| {
             AuthError::Provider(format!(
-                "Failed to parse device authorization response: {}",
-                e
+                "Failed to parse device authorization response: {e}"
             ))
         })
     }
@@ -113,10 +111,8 @@ impl DeviceFlow {
                 .map_err(|_| AuthError::Network)?;
 
             let response_text = response.text().await.map_err(|e| {
-                AuthError::Provider(format!("Failed to read token response body: {}", e))
+                AuthError::Provider(format!("Failed to read token response body: {e}"))
             })?;
-
-            println!("Raw token response body: {}", response_text);
 
             // Attempt to deserialize as OAuthErrorResponse first
             if let Ok(oauth_error) = serde_json::from_str::<OAuthErrorResponse>(&response_text) {
