@@ -1,6 +1,6 @@
 use actix_web::{dev::Payload, http::header, web, Error, FromRequest, HttpRequest};
-use authkestra_session::{Session, SessionConfig, SessionStore};
 use authkestra_flow::Authkestra;
+use authkestra_session::{Session, SessionConfig, SessionStore};
 use authkestra_token::TokenManager;
 use futures::future::LocalBoxFuture;
 use std::sync::Arc;

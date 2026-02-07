@@ -44,11 +44,12 @@ impl OidcProvider {
         client_id: String,
         client_secret: String,
         redirect_uri: String,
-        issuer_url: &str
+        issuer_url: &str,
     ) -> Result<Self, OidcError> {
         let client = reqwest::Client::new();
         let metadata = ProviderMetadata::discover(issuer_url, client.clone()).await?;
-        let cache = authkestra_token::JwksCache::new(metadata.jwks_uri.clone(), Duration::from_secs(3600));
+        let cache =
+            authkestra_token::JwksCache::new(metadata.jwks_uri.clone(), Duration::from_secs(3600));
 
         Ok(Self {
             client_id,

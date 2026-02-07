@@ -78,7 +78,10 @@ async fn main() {
         .route("/", get(frontend))
         .route("/auth/login", get(login_handler))
         .route("/auth/logout", get(logout_handler))
-        .route("/api/callback", get(callback_handler).post(callback_handler))
+        .route(
+            "/api/callback",
+            get(callback_handler).post(callback_handler),
+        )
         .route("/api/protected", get(protected_resource))
         .layer(CookieManagerLayer::new())
         .with_state(state);

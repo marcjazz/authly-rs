@@ -33,7 +33,6 @@ pub enum SameSite {
     None,
 }
 
-
 /// A unified identity structure returned by all providers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Identity {
@@ -235,4 +234,3 @@ pub struct OAuthErrorResponse {
     /// A human-readable ASCII text description of the error.
     pub error_description: Option<String>,
 }
-

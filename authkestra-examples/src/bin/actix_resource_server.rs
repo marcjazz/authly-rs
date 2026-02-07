@@ -34,9 +34,9 @@ async fn main() -> std::io::Result<()> {
     dotenvy::dotenv().ok();
 
     // 1. Retrieve the OIDC provider's
-    // For example, Google's JWKS URI: 
-    let issuer = std::env::var("OIDC_ISSUER")
-        .unwrap_or_else(|_| "https://accounts.google.com".to_string());
+    // For example, Google's JWKS URI:
+    let issuer =
+        std::env::var("OIDC_ISSUER").unwrap_or_else(|_| "https://accounts.google.com".to_string());
     let ProviderMetadata { jwks_uri, .. } =
         ProviderMetadata::discover(&issuer, reqwest::Client::new())
             .await

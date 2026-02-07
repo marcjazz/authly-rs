@@ -62,7 +62,7 @@ impl Jwk {
             ValidationError::Validation("Missing 'e' component in JWK".to_string())
         })?;
 
-        DecodingKey::from_rsa_components(n, e).map_err(|e| ValidationError::Jwt(e))
+        DecodingKey::from_rsa_components(n, e).map_err(ValidationError::Jwt)
     }
 }
 
