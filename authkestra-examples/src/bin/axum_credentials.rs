@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use authkestra_axum::{AuthSession, AuthkestraState};
-use authkestra_core::{AuthError, CredentialsProvider, Identity, UserMapper};
+use authkestra_core::{error::AuthError, state::Identity, CredentialsProvider, UserMapper};
 use authkestra_flow::{Authkestra, CredentialsFlow};
 use authkestra_session::{MemoryStore, Session, SessionConfig, SessionStore};
 use axum::{

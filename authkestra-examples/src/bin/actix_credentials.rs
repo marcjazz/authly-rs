@@ -2,7 +2,7 @@ use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authkestra_actix::AuthSession;
 use authkestra_axum::{Session, SessionStore};
-use authkestra_core::{AuthError, CredentialsProvider, Identity, UserMapper};
+use authkestra_core::{error::AuthError, state::Identity, CredentialsProvider, UserMapper};
 use authkestra_flow::{Authkestra, CredentialsFlow};
 use serde::Deserialize;
 use std::collections::HashMap;
