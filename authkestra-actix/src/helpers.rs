@@ -58,13 +58,19 @@ pub fn initiate_oauth_login_erased(
 
     let cookie_name = format!("authkestra_flow_{}", csrf_state);
 
-    let cookie = Cookie::build(cookie_name, pkce.code_verifier)
+    let mut builder = Cookie::build(cookie_name, pkce.code_verifier)
         .path("/")
         .http_only(true)
         .same_site(actix_web::cookie::SameSite::Lax)
-        .secure(session_config.secure)
-        .max_age(actix_web::cookie::time::Duration::minutes(15))
-        .finish();
+        .secure(session_config.secure);
+
+    if let Some(max_age) = session_config.max_age {
+        builder = builder.max_age(actix_web::cookie::time::Duration::seconds(
+            max_age.num_seconds(),
+        ));
+    }
+
+    let cookie = builder.finish();
 
     HttpResponse::Found()
         .insert_header((header::LOCATION, url))

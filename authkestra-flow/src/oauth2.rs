@@ -64,7 +64,7 @@ impl<P: OAuthProvider> OAuth2Flow<P, ()> {
             provider,
             mapper: None,
             scopes: Vec::new(),
-            use_pkce: false,
+            use_pkce: true,
         }
     }
 }
@@ -76,7 +76,7 @@ impl<P: OAuthProvider, M: UserMapper> OAuth2Flow<P, M> {
             provider,
             mapper: Some(mapper),
             scopes: Vec::new(),
-            use_pkce: false,
+            use_pkce: true,
         }
     }
 

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use authkestra_axum::{AuthSession, AuthkestraState};
+use authkestra_axum::AuthSession;
 use authkestra_core::{error::AuthError, state::Identity, CredentialsProvider, UserMapper};
 use authkestra_flow::{Authkestra, CredentialsFlow};
 use authkestra_session::{MemoryStore, Session, SessionConfig, SessionStore};
@@ -79,24 +79,24 @@ impl UserMapper for SqlxUserMapper {
 #[derive(Clone)]
 struct AppState {
     auth_flow: Arc<CredentialsFlow<MyCredentialsProvider, SqlxUserMapper>>,
-    authkestra_state: AuthkestraState,
+    authkestra: Authkestra,
 }
 
-impl axum::extract::FromRef<AppState> for AuthkestraState {
+impl axum::extract::FromRef<AppState> for Authkestra {
     fn from_ref(state: &AppState) -> Self {
-        state.authkestra_state.clone()
+        state.authkestra.clone()
     }
 }
 
 impl axum::extract::FromRef<AppState> for Arc<dyn SessionStore> {
     fn from_ref(state: &AppState) -> Self {
-        state.authkestra_state.authkestra.session_store.clone()
+        state.authkestra.session_store.clone()
     }
 }
 
 impl axum::extract::FromRef<AppState> for SessionConfig {
     fn from_ref(state: &AppState) -> Self {
-        state.authkestra_state.authkestra.session_config.clone()
+        state.authkestra.session_config.clone()
     }
 }
 
@@ -112,7 +112,7 @@ async fn main() {
 
     let state = AppState {
         auth_flow,
-        authkestra_state: AuthkestraState { authkestra },
+        authkestra,
     };
 
     let app = Router::new()
@@ -162,17 +162,14 @@ async fn login(
     };
 
     state
-        .authkestra_state
         .authkestra
         .session_store
         .save_session(&session)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    let cookie = authkestra_axum::helpers::create_axum_cookie(
-        &state.authkestra_state.authkestra.session_config,
-        session.id,
-    );
+    let cookie =
+        authkestra_axum::helpers::create_axum_cookie(&state.authkestra.session_config, session.id);
     cookies.add(cookie);
 
     Ok(Redirect::to("/protected"))

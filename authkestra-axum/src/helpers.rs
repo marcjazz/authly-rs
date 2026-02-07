@@ -69,7 +69,11 @@ pub fn initiate_oauth_login(
     cookie.set_same_site(SameSite::Lax);
     cookie.set_secure(session_config.secure);
     // Set a reasonable expiry for the flow (e.g., 15 minutes)
-    cookie.set_max_age(Some(tower_cookies::cookie::time::Duration::minutes(15)));
+    cookie.set_max_age(
+        session_config
+            .max_age
+            .map(|d| tower_cookies::cookie::time::Duration::seconds(d.num_seconds())),
+    );
 
     cookies.add(cookie);
 
@@ -282,19 +286,26 @@ where
     };
 
     let scopes_str = params.scope.unwrap_or_default();
-    let scopes: Vec<&str> = scopes_str.split_whitespace().collect();
+    // Allow space or comma separated scopes
+    let scopes: Vec<&str> = scopes_str
+        .split(|c: char| c == ' ' || c == ',')
+        .filter(|s| !s.is_empty())
+        .collect();
 
     let pkce = Pkce::new();
     let (url, csrf_state) = flow.initiate_login(&scopes, Some(&pkce.code_challenge));
 
     let cookie_name = format!("authkestra_flow_{}", csrf_state);
+    let cookie_max_age = session_config
+        .max_age
+        .map(|d| tower_cookies::cookie::time::Duration::seconds(d.num_seconds()));
 
     let mut cookie = Cookie::new(cookie_name, pkce.code_verifier);
     cookie.set_path("/");
     cookie.set_http_only(true);
     cookie.set_same_site(SameSite::Lax);
     cookie.set_secure(session_config.secure);
-    cookie.set_max_age(Some(tower_cookies::cookie::time::Duration::minutes(15)));
+    cookie.set_max_age(cookie_max_age);
 
     cookies.add(cookie);
 
@@ -303,7 +314,7 @@ where
         cookie.set_path("/");
         cookie.set_http_only(true);
         cookie.set_secure(session_config.secure);
-        cookie.set_max_age(Some(tower_cookies::cookie::time::Duration::minutes(15)));
+        cookie.set_max_age(cookie_max_age);
         cookies.add(cookie);
     }
 

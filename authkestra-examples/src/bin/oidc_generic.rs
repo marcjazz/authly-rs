@@ -6,34 +6,6 @@ use axum::{response::IntoResponse, routing::get, Router};
 use std::sync::Arc;
 use tower_cookies::CookieManagerLayer;
 
-#[derive(Clone)]
-struct AppState {
-    authkestra_state: AuthkestraState,
-}
-
-impl axum::extract::FromRef<AppState> for AuthkestraState {
-    fn from_ref(state: &AppState) -> Self {
-        state.authkestra_state.clone()
-    }
-}
-
-impl axum::extract::FromRef<AppState> for Authkestra {
-    fn from_ref(state: &AppState) -> Self {
-        state.authkestra_state.authkestra.clone()
-    }
-}
-
-impl axum::extract::FromRef<AppState> for Arc<dyn SessionStore> {
-    fn from_ref(state: &AppState) -> Self {
-        state.authkestra_state.authkestra.session_store.clone()
-    }
-}
-
-impl axum::extract::FromRef<AppState> for authkestra_session::SessionConfig {
-    fn from_ref(state: &AppState) -> Self {
-        state.authkestra_state.authkestra.session_config.clone()
-    }
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -65,13 +37,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .session_store(session_store)
         .build();
 
-    let state = AppState {
-        authkestra_state: AuthkestraState { authkestra },
-    };
+    let state =  AuthkestraState { authkestra };
 
     let app = Router::new()
         .route("/", get(index))
-        .merge(state.authkestra_state.authkestra.axum_router())
+        .merge(state.authkestra.axum_router())
         .route("/protected", get(protected))
         .layer(CookieManagerLayer::new())
         .with_state(state);
