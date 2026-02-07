@@ -1,9 +1,8 @@
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authkestra_actix::AuthSession;
-use authkestra_core::{
-    AuthError, CredentialsProvider, Identity, Session, SessionStore, UserMapper,
-};
+use authkestra_axum::{Session, SessionStore};
+use authkestra_core::{AuthError, CredentialsProvider, Identity, UserMapper};
 use authkestra_flow::{Authkestra, CredentialsFlow};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -128,7 +127,7 @@ async fn main() -> std::io::Result<()> {
     let mapper = MyUserMapper;
     let auth_flow = Arc::new(CredentialsFlow::with_mapper(provider, mapper));
 
-    let session_store: Arc<dyn SessionStore> = Arc::new(authkestra_core::MemoryStore::default());
+    let session_store: Arc<dyn SessionStore> = Arc::new(authkestra_session::MemoryStore::default());
 
     let authkestra = Authkestra::builder()
         .session_store(session_store.clone())

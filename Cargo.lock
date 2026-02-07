@@ -382,6 +382,7 @@ version = "0.1.1"
 dependencies = [
  "async-trait",
  "authkestra-core",
+ "authkestra-session",
  "authkestra-token",
  "log",
  "reqwest",
@@ -424,7 +425,7 @@ dependencies = [
 
 [[package]]
 name = "authkestra-providers-github"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "authkestra-core",
@@ -437,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "authkestra-providers-google"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "authkestra-core",
@@ -450,7 +451,7 @@ dependencies = [
 
 [[package]]
 name = "authkestra-session"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "authkestra-core",

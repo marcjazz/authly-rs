@@ -1,8 +1,8 @@
 use authkestra_axum::{
     helpers::{handle_oauth_callback_jwt_erased, initiate_oauth_login, OAuthCallbackParams},
-    AuthToken, Authkestra, SessionConfig,
+    AuthToken, SessionConfig,
 };
-use authkestra_flow::OAuth2Flow;
+use authkestra_flow::{Authkestra, OAuth2Flow};
 use authkestra_providers_github::GithubProvider;
 use authkestra_token::TokenManager;
 use axum::{

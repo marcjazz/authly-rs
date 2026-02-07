@@ -8,7 +8,7 @@ publish = false
 authkestra = { path = "../authkestra", features = ["full"] }
 authkestra-core = { path = "../authkestra-core" }
 authkestra-flow = { path = "../authkestra-flow" }
-authkestra-session = { path = "../authkestra-session", features = ["sqlite", "store-redis"] }
+authkestra-session = { version = "0.1.1", path = "../authkestra-session", features = ["sqlite", "redis-store"] }
 authkestra-token = { path = "../authkestra-token" }
 authkestra-oidc = { path = "../authkestra-oidc" }
 authkestra-axum = { path = "../authkestra-axum" }

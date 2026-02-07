@@ -11,8 +11,8 @@
 //! - `AUTHKESTRA_DISCORD_CLIENT_ID`
 //! - `AUTHKESTRA_DISCORD_CLIENT_SECRET`
 
-use authkestra_axum::{AuthSession, Authkestra, AuthkestraAxumExt, AuthkestraState, SessionConfig};
-use authkestra_flow::OAuth2Flow;
+use authkestra_axum::{AuthSession, AuthkestraAxumExt, AuthkestraState, SessionConfig};
+use authkestra_flow::{Authkestra, OAuth2Flow};
 use authkestra_providers_discord::DiscordProvider;
 use authkestra_providers_github::GithubProvider;
 use authkestra_providers_google::GoogleProvider;

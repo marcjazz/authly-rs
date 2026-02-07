@@ -1,5 +1,5 @@
-pub use authkestra_core::SessionConfig;
-use authkestra_core::{pkce::Pkce, Identity, OAuthProvider, OAuthToken, Session, SessionStore};
+pub use authkestra_session::{Session, SessionConfig, SessionStore};
+use authkestra_core::{pkce::Pkce, Identity, OAuthProvider, OAuthToken};
 use authkestra_flow::{Authkestra, ErasedOAuthFlow, OAuth2Flow};
 use authkestra_token::TokenManager;
 use axum::{

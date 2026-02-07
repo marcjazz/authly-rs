@@ -33,57 +33,6 @@ pub enum SameSite {
     None,
 }
 
-/// Configuration for session cookies.
-#[derive(Clone, Debug)]
-pub struct SessionConfig {
-    /// The name of the session cookie.
-    pub cookie_name: String,
-    /// Whether the cookie should only be sent over HTTPS.
-    pub secure: bool,
-    /// Whether the cookie should be inaccessible to client-side scripts.
-    pub http_only: bool,
-    /// The `SameSite` attribute for the cookie.
-    pub same_site: SameSite,
-    /// The path for which the cookie is valid.
-    pub path: String,
-    /// The maximum age of the session.
-    pub max_age: Option<chrono::Duration>,
-}
-
-impl Default for SessionConfig {
-    fn default() -> Self {
-        Self {
-            cookie_name: "authkestra_session".to_string(),
-            secure: true,
-            http_only: true,
-            same_site: SameSite::Lax,
-            path: "/".to_string(),
-            max_age: Some(chrono::Duration::hours(24)),
-        }
-    }
-}
-
-/// Represents an active user session.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Session {
-    /// Unique session identifier.
-    pub id: String,
-    /// The identity associated with this session.
-    pub identity: Identity,
-    /// When the session expires.
-    pub expires_at: chrono::DateTime<chrono::Utc>,
-}
-
-/// Trait for implementing session persistence.
-#[async_trait]
-pub trait SessionStore: Send + Sync + 'static {
-    /// Load a session by its ID.
-    async fn load_session(&self, id: &str) -> Result<Option<Session>, AuthError>;
-    /// Save or update a session.
-    async fn save_session(&self, session: &Session) -> Result<(), AuthError>;
-    /// Delete a session by its ID.
-    async fn delete_session(&self, id: &str) -> Result<(), AuthError>;
-}
 
 /// A unified identity structure returned by all providers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -287,36 +236,3 @@ pub struct OAuthErrorResponse {
     pub error_description: Option<String>,
 }
 
-/// An in-memory implementation of [`SessionStore`].
-///
-/// **Note**: This store is not persistent and will be cleared when the application restarts.
-/// It is primarily intended for development and testing.
-#[derive(Default)]
-pub struct MemoryStore {
-    sessions: std::sync::Mutex<HashMap<String, Session>>,
-}
-
-impl MemoryStore {
-    /// Create a new, empty `MemoryStore`.
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[async_trait]
-impl SessionStore for MemoryStore {
-    async fn load_session(&self, id: &str) -> Result<Option<Session>, AuthError> {
-        Ok(self.sessions.lock().unwrap().get(id).cloned())
-    }
-    async fn save_session(&self, session: &Session) -> Result<(), AuthError> {
-        self.sessions
-            .lock()
-            .unwrap()
-            .insert(session.id.clone(), session.clone());
-        Ok(())
-    }
-    async fn delete_session(&self, id: &str) -> Result<(), AuthError> {
-        self.sessions.lock().unwrap().remove(id);
-        Ok(())
-    }
-}

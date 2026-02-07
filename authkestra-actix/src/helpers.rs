@@ -1,5 +1,6 @@
 use actix_web::{cookie::Cookie, http::header, web, HttpRequest, HttpResponse};
-use authkestra_core::{pkce::Pkce, OAuthProvider, Session, SessionConfig, SessionStore};
+use authkestra_session::{Session, SessionConfig, SessionStore};
+use authkestra_core::{pkce::Pkce, OAuthProvider};
 use authkestra_flow::{Authkestra, ErasedOAuthFlow, OAuth2Flow};
 use std::sync::Arc;
 

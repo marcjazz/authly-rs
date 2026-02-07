@@ -14,10 +14,8 @@
 #![warn(missing_docs)]
 
 pub use authkestra_core::ErasedOAuthFlow;
-use authkestra_core::{
-    AuthError, CredentialsProvider, Identity, OAuthProvider, SessionConfig, SessionStore,
-    UserMapper,
-};
+use authkestra_core::{AuthError, CredentialsProvider, Identity, OAuthProvider, UserMapper};
+use authkestra_session::{MemoryStore, SessionConfig, SessionStore};
 use authkestra_token::TokenManager;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -98,7 +96,7 @@ impl AuthkestraBuilder {
             providers: self.providers,
             session_store: self
                 .session_store
-                .unwrap_or_else(|| Arc::new(authkestra_core::MemoryStore::default())),
+                .unwrap_or_else(|| Arc::new(MemoryStore::default())),
             session_config: self.session_config,
             token_manager: self
                 .token_manager

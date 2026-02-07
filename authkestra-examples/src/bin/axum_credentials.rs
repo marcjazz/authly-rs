@@ -1,9 +1,8 @@
 use async_trait::async_trait;
-use authkestra_axum::{AuthSession, Authkestra, AuthkestraState, SessionConfig};
-use authkestra_core::{
-    AuthError, CredentialsProvider, Identity, Session, SessionStore, UserMapper,
-};
-use authkestra_flow::CredentialsFlow;
+use authkestra_axum::{AuthSession, AuthkestraState};
+use authkestra_core::{AuthError, CredentialsProvider, Identity, UserMapper};
+use authkestra_flow::{Authkestra, CredentialsFlow};
+use authkestra_session::{MemoryStore, Session, SessionConfig, SessionStore};
 use axum::{
     extract::{Form, State},
     response::{IntoResponse, Redirect},
@@ -107,7 +106,7 @@ async fn main() {
     let mapper = SqlxUserMapper {};
     let auth_flow = Arc::new(CredentialsFlow::with_mapper(provider, mapper));
 
-    let session_store = Arc::new(authkestra_core::MemoryStore::default());
+    let session_store = Arc::new(MemoryStore::default());
 
     let authkestra = Authkestra::builder().session_store(session_store).build();
 

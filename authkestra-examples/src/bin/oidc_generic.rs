@@ -1,6 +1,6 @@
-use authkestra_axum::{AuthSession, Authkestra, AuthkestraAxumExt, AuthkestraState};
-use authkestra_core::SessionStore;
-use authkestra_flow::OAuth2Flow;
+use authkestra_axum::{AuthSession, AuthkestraAxumExt, AuthkestraState};
+use authkestra_session::SessionStore;
+use authkestra_flow::{Authkestra, OAuth2Flow};
 use authkestra_oidc::OidcProvider;
 use axum::{response::IntoResponse, routing::get, Router};
 use std::sync::Arc;
@@ -29,7 +29,7 @@ impl axum::extract::FromRef<AppState> for Arc<dyn SessionStore> {
     }
 }
 
-impl axum::extract::FromRef<AppState> for authkestra_core::SessionConfig {
+impl axum::extract::FromRef<AppState> for authkestra_session::SessionConfig {
     fn from_ref(state: &AppState) -> Self {
         state.authkestra_state.authkestra.session_config.clone()
     }
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(authkestra_session::RedisStore::new(&redis_url, "authkestra".into()).unwrap())
     } else {
         println!("Using MemoryStore");
-        Arc::new(authkestra_core::MemoryStore::default())
+        Arc::new(authkestra_session::MemoryStore::default())
     };
 
     let authkestra = Authkestra::builder()
