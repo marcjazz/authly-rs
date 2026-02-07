@@ -295,6 +295,7 @@ dependencies = [
  "authkestra-providers-google",
  "authkestra-session",
  "authkestra-token",
+ "tokio",
 ]
 
 [[package]]
@@ -384,6 +385,7 @@ dependencies = [
  "authkestra-core",
  "authkestra-session",
  "authkestra-token",
+ "chrono",
  "log",
  "reqwest",
  "serde",

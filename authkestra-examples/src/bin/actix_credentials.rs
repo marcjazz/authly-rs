@@ -1,9 +1,9 @@
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
 use authkestra_actix::AuthSession;
-use authkestra_axum::{Session, SessionStore};
+use authkestra_session::SessionStore;
 use authkestra_core::{error::AuthError, state::Identity, CredentialsProvider, UserMapper};
-use authkestra_flow::{Authkestra, CredentialsFlow};
+use authkestra::{AuthkestraClient, flow::{Authkestra, CredentialsFlow}};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -63,7 +63,7 @@ impl UserMapper for MyUserMapper {
 // 4. App State
 struct AppState {
     auth_flow: Arc<CredentialsFlow<MyCredentialsProvider, MyUserMapper>>,
-    authkestra: Authkestra,
+    authkestra: AuthkestraClient,
 }
 
 #[get("/")]
@@ -82,33 +82,31 @@ async fn index() -> impl Responder {
 }
 
 #[post("/login")]
-async fn login(data: web::Data<AppState>, creds: web::Form<LoginCredentials>) -> impl Responder {
+async fn login(
+    data: web::Data<AppState>,
+    creds: web::Form<LoginCredentials>,
+) -> Result<HttpResponse, actix_web::Error> {
     let (identity, local_user) = match data.auth_flow.authenticate(creds.into_inner()).await {
         Ok(res) => res,
-        Err(e) => return HttpResponse::Unauthorized().body(e.to_string()),
+        Err(e) => return Ok(HttpResponse::Unauthorized().body(e.to_string())),
     };
 
     if let Some(user) = &local_user {
         println!("Logged in as local user: {:?}", user);
     }
 
-    let session = Session {
-        id: uuid::Uuid::new_v4().to_string(),
-        identity,
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
+    let session = match data.authkestra.create_session(identity).await {
+        Ok(s) => s,
+        Err(e) => return Ok(HttpResponse::InternalServerError().body(e.to_string())),
     };
-
-    if let Err(e) = data.authkestra.session_store.save_session(&session).await {
-        return HttpResponse::InternalServerError().body(e.to_string());
-    }
 
     let cookie =
         authkestra_actix::helpers::create_actix_cookie(&data.authkestra.session_config, session.id);
 
-    HttpResponse::Found()
+    Ok(HttpResponse::Found()
         .append_header(("Location", "/protected"))
         .cookie(cookie)
-        .finish()
+        .finish())
 }
 
 #[get("/protected")]
@@ -143,6 +141,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(app_state.clone())
+            .app_data(web::Data::new(authkestra.clone()))
             .app_data(web::Data::new(session_store.clone()))
             .app_data(web::Data::new(authkestra.session_config.clone()))
             .service(index)

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use authkestra_axum::AuthSession;
 use authkestra_core::{error::AuthError, state::Identity, CredentialsProvider, UserMapper};
-use authkestra_flow::{Authkestra, CredentialsFlow};
-use authkestra_session::{MemoryStore, Session, SessionConfig, SessionStore};
+use authkestra::{AuthkestraClient, AuthkestraClientState, flow::{Authkestra, CredentialsFlow}};
+use authkestra_session::{MemoryStore, SessionConfig, SessionStore};
 use axum::{
     extract::{Form, State},
     response::{IntoResponse, Redirect},
@@ -79,18 +79,28 @@ impl UserMapper for SqlxUserMapper {
 #[derive(Clone)]
 struct AppState {
     auth_flow: Arc<CredentialsFlow<MyCredentialsProvider, SqlxUserMapper>>,
-    authkestra: Authkestra,
+    authkestra: AuthkestraClient,
 }
 
-impl axum::extract::FromRef<AppState> for Authkestra {
+impl axum::extract::FromRef<AppState> for AuthkestraClient {
     fn from_ref(state: &AppState) -> Self {
         state.authkestra.clone()
     }
 }
 
-impl axum::extract::FromRef<AppState> for Arc<dyn SessionStore> {
+impl axum::extract::FromRef<AppState> for AuthkestraClientState {
     fn from_ref(state: &AppState) -> Self {
-        state.authkestra.session_store.clone()
+        AuthkestraClientState::from(state.authkestra.clone())
+    }
+}
+
+impl axum::extract::FromRef<AppState>
+    for Result<Arc<dyn SessionStore>, authkestra_axum::AuthkestraAxumError>
+{
+    fn from_ref(state: &AppState) -> Self {
+        Result::<Arc<dyn SessionStore>, authkestra_axum::AuthkestraAxumError>::from_ref(
+            &AuthkestraClientState::from(state.authkestra.clone()),
+        )
     }
 }
 
@@ -108,7 +118,9 @@ async fn main() {
 
     let session_store = Arc::new(MemoryStore::default());
 
-    let authkestra = Authkestra::builder().session_store(session_store).build();
+    let authkestra = Authkestra::builder()
+        .session_store(session_store)
+        .build();
 
     let state = AppState {
         auth_flow,
@@ -155,16 +167,9 @@ async fn login(
         println!("Logged in as local user: {:?}", user);
     }
 
-    let session = Session {
-        id: uuid::Uuid::new_v4().to_string(),
-        identity,
-        expires_at: chrono::Utc::now() + chrono::Duration::hours(24),
-    };
-
-    state
+    let session = state
         .authkestra
-        .session_store
-        .save_session(&session)
+        .create_session(identity)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

@@ -24,6 +24,7 @@ pub struct Claims {
     pub custom: HashMap<String, serde_json::Value>,
 }
 
+#[derive(Clone)]
 pub struct TokenManager {
     encoding_key: EncodingKey,
     decoding_key: DecodingKey,
@@ -37,6 +38,11 @@ impl TokenManager {
             decoding_key: DecodingKey::from_secret(secret),
             issuer,
         }
+    }
+
+    pub fn with_issuer(mut self, issuer: String) -> Self {
+        self.issuer = Some(issuer);
+        self
     }
 
     /// Issues a token for a user identity.

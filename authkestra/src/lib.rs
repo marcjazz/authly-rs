@@ -23,6 +23,36 @@ pub use authkestra_axum as axum;
 #[cfg(feature = "actix")]
 pub use authkestra_actix as actix;
 
+#[cfg(feature = "flow")]
+mod aliases {
+    pub use crate::flow::{
+        Authkestra, AuthkestraClient, AuthkestraFull, AuthkestraResourceServer, AuthkestraSpa,
+        Configured, HasSessionStoreMarker as HasSessionStore,
+        HasTokenManagerMarker as HasTokenManager, Missing, NoSessionStoreMarker as NoSessionStore,
+        NoTokenManagerMarker as NoTokenManager,
+    };
+}
+
+#[cfg(feature = "flow")]
+pub use aliases::*;
+
+#[cfg(all(feature = "flow", feature = "axum"))]
+/// Axum-specific type aliases for Authkestra state.
+pub mod axum_aliases {
+    pub use crate::aliases::*;
+    use crate::axum::AuthkestraState;
+
+    /// Axum state for a full OIDC client with sessions.
+    pub type AuthkestraClientState = AuthkestraState<HasSessionStore, NoTokenManager>;
+    /// Axum state for a Single Page Application (SPA) using JWTs.
+    pub type AuthkestraSpaState = AuthkestraState<NoSessionStore, HasTokenManager>;
+    /// Axum state for a Resource Server (API) validating tokens.
+    pub type AuthkestraResourceServerState = AuthkestraState<NoSessionStore, HasTokenManager>;
+}
+
+#[cfg(all(feature = "flow", feature = "axum"))]
+pub use axum_aliases::*;
+
 /// Authentication providers.
 pub mod providers {
     #[cfg(feature = "github")]

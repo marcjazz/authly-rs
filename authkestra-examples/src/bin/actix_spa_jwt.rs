@@ -13,13 +13,11 @@ use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use authkestra_actix::{
     handle_oauth_callback_jwt_erased, initiate_oauth_login_erased, AuthToken, OAuthCallbackParams,
 };
-use authkestra_flow::{Authkestra, OAuth2Flow};
+use authkestra::{AuthkestraSpa, flow::{Authkestra, HasTokenManager, OAuth2Flow}};
 use authkestra_providers_github::GithubProvider;
-use authkestra_token::TokenManager;
-use std::sync::Arc;
 
 struct AppState {
-    authkestra: Authkestra,
+    authkestra: AuthkestraSpa,
 }
 
 #[get("/")]
@@ -115,7 +113,9 @@ async fn frontend() -> impl Responder {
 }
 
 #[get("/auth/login")]
-async fn login_handler(data: web::Data<AppState>) -> impl Responder {
+async fn login_handler(
+    data: web::Data<AppState>,
+) -> impl Responder {
     let flow = &data.authkestra.providers["github"];
     initiate_oauth_login_erased(flow, &data.authkestra.session_config, &["user:email"])
 }
@@ -125,22 +125,22 @@ async fn callback_handler(
     data: web::Data<AppState>,
     params: web::Query<OAuthCallbackParams>,
     req: actix_web::HttpRequest,
-) -> impl Responder {
+) -> Result<HttpResponse, actix_web::Error> {
     let flow = &data.authkestra.providers["github"];
 
     let res = handle_oauth_callback_jwt_erased(
         flow,
         &req,
         params.into_inner(),
-        data.authkestra.token_manager.clone(),
+        data.authkestra.token_manager(),
         3600,
         &data.authkestra.session_config,
     )
     .await;
 
     match res {
-        Ok(token_resp) => token_resp,
-        Err(err) => HttpResponse::from_error(err),
+        Ok(token_resp) => Ok(token_resp),
+        Err(err) => Err(err),
     }
 }
 
@@ -167,19 +167,15 @@ async fn main() -> std::io::Result<()> {
     let redirect_uri = std::env::var("AUTHKESTRA_GITHUB_REDIRECT_URI")
         .unwrap_or_else(|_| "http://localhost:3000/".to_string());
 
-    let token_manager = Arc::new(TokenManager::new(
-        b"a-very-secret-key-that-is-at-least-32-bytes-long!!",
-        None,
-    ));
-
-    let authkestra = Authkestra::builder()
+    let authkestra = Authkestra::spa(b"a-very-secret-key-that-is-at-least-32-bytes-long!!")
         .provider(OAuth2Flow::new(GithubProvider::new(
             client_id,
             client_secret,
             redirect_uri,
         )))
-        .token_manager(token_manager.clone())
         .build();
+
+    let token_manager = authkestra.token_manager();
 
     let app_state = web::Data::new(AppState {
         authkestra: authkestra.clone(),
@@ -190,6 +186,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(app_state.clone())
+            .app_data(web::Data::new(authkestra.clone()))
             .app_data(web::Data::new(token_manager.clone()))
             .app_data(web::Data::new(authkestra.session_config.clone()))
             .service(frontend)

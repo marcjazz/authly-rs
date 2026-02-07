@@ -1,4 +1,4 @@
-use authkestra_flow::Authkestra;
+use authkestra_flow::{Authkestra, Missing};
 use authkestra_token::TokenManager;
 use axum::{
     extract::{FromRef, FromRequestParts},
@@ -14,37 +14,49 @@ pub mod helpers;
 pub use helpers::*;
 
 #[derive(Clone)]
-pub struct AuthkestraState {
-    pub authkestra: Authkestra,
+pub struct AuthkestraState<S = Missing, T = Missing> {
+    pub authkestra: Authkestra<S, T>,
 }
 
-impl From<Authkestra> for AuthkestraState {
-    fn from(authkestra: Authkestra) -> Self {
+impl<S, T> From<Authkestra<S, T>> for AuthkestraState<S, T> {
+    fn from(authkestra: Authkestra<S, T>) -> Self {
         Self { authkestra }
     }
 }
 
-impl FromRef<AuthkestraState> for Authkestra {
-    fn from_ref(state: &AuthkestraState) -> Self {
+impl<S: Clone, T: Clone> FromRef<AuthkestraState<S, T>> for Authkestra<S, T> {
+    fn from_ref(state: &AuthkestraState<S, T>) -> Self {
         state.authkestra.clone()
     }
 }
 
-impl FromRef<AuthkestraState> for Arc<dyn SessionStore> {
-    fn from_ref(state: &AuthkestraState) -> Self {
-        state.authkestra.session_store.clone()
+impl<S, T> FromRef<AuthkestraState<S, T>> for Result<Arc<dyn SessionStore>, AuthkestraAxumError>
+where
+    S: authkestra_flow::SessionStoreState,
+{
+    fn from_ref(state: &AuthkestraState<S, T>) -> Self {
+        state
+            .authkestra
+            .session_store
+            .get_store()
+            .ok_or_else(|| {
+                AuthkestraAxumError::ComponentMissing("Session store not configured".to_string())
+            })
     }
 }
 
-impl FromRef<AuthkestraState> for SessionConfig {
-    fn from_ref(state: &AuthkestraState) -> Self {
+impl<S, T> FromRef<AuthkestraState<S, T>> for SessionConfig {
+    fn from_ref(state: &AuthkestraState<S, T>) -> Self {
         state.authkestra.session_config.clone()
     }
 }
 
-impl FromRef<AuthkestraState> for Arc<TokenManager> {
-    fn from_ref(state: &AuthkestraState) -> Self {
-        state.authkestra.token_manager.clone()
+impl<S, T> FromRef<AuthkestraState<S, T>> for Result<Arc<TokenManager>, AuthkestraAxumError>
+where
+    T: authkestra_flow::TokenManagerState,
+{
+    fn from_ref(state: &AuthkestraState<S, T>) -> Self {
+        Ok(state.authkestra.token_manager.get_manager())
     }
 }
 
@@ -54,13 +66,13 @@ pub struct AuthSession(pub Session);
 impl<S> FromRequestParts<S> for AuthSession
 where
     S: Send + Sync,
-    Arc<dyn SessionStore>: FromRef<S>,
+    Result<Arc<dyn SessionStore>, AuthkestraAxumError>: FromRef<S>,
     SessionConfig: FromRef<S>,
 {
     type Rejection = AuthkestraAxumError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let session_store = Arc::<dyn SessionStore>::from_ref(state);
+        let session_store = <Result<Arc<dyn SessionStore>, AuthkestraAxumError>>::from_ref(state)?;
         let session_config = SessionConfig::from_ref(state);
         let cookies = Cookies::from_request_parts(parts, state)
             .await
@@ -80,12 +92,12 @@ pub struct AuthToken(pub authkestra_token::Claims);
 impl<S> FromRequestParts<S> for AuthToken
 where
     S: Send + Sync,
-    Arc<TokenManager>: FromRef<S>,
+    Result<Arc<TokenManager>, AuthkestraAxumError>: FromRef<S>,
 {
     type Rejection = AuthkestraAxumError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let token_manager = Arc::<TokenManager>::from_ref(state);
+        let token_manager = <Result<Arc<TokenManager>, AuthkestraAxumError>>::from_ref(state)?;
         let token = helpers::get_token(parts, &token_manager).await?;
         Ok(AuthToken(token))
     }
@@ -139,30 +151,38 @@ where
     }
 }
 
-pub trait AuthkestraAxumExt {
-    fn axum_router<S>(&self) -> axum::Router<S>
+pub trait AuthkestraAxumExt<S, T> {
+    fn axum_router<AppState>(&self) -> axum::Router<AppState>
     where
-        S: Clone + Send + Sync + 'static,
-        Authkestra: FromRef<S>,
-        SessionConfig: FromRef<S>,
-        Arc<dyn SessionStore>: FromRef<S>;
+        AppState: Clone + Send + Sync + 'static,
+        Authkestra<S, T>: FromRef<AppState>,
+        SessionConfig: FromRef<AppState>,
+        Result<Arc<dyn SessionStore>, AuthkestraAxumError>: FromRef<AppState>;
 }
 
-impl AuthkestraAxumExt for Authkestra {
-    fn axum_router<S>(&self) -> axum::Router<S>
+impl<S: Clone + Send + Sync + 'static, T: Clone + Send + Sync + 'static> AuthkestraAxumExt<S, T>
+    for Authkestra<S, T>
+{
+    fn axum_router<AppState>(&self) -> axum::Router<AppState>
     where
-        S: Clone + Send + Sync + 'static,
-        Authkestra: FromRef<S>,
-        SessionConfig: FromRef<S>,
-        Arc<dyn SessionStore>: FromRef<S>,
+        AppState: Clone + Send + Sync + 'static,
+        Authkestra<S, T>: FromRef<AppState>,
+        SessionConfig: FromRef<AppState>,
+        Result<Arc<dyn SessionStore>, AuthkestraAxumError>: FromRef<AppState>,
     {
         use axum::routing::get;
         axum::Router::new()
-            .route("/auth/{provider}", get(helpers::axum_login_handler::<S>))
+            .route(
+                "/auth/{provider}",
+                get(helpers::axum_login_handler::<AppState, S, T>),
+            )
             .route(
                 "/auth/{provider}/callback",
-                get(helpers::axum_callback_handler::<S>),
+                get(helpers::axum_callback_handler::<AppState, S, T>),
             )
-            .route("/auth/logout", get(helpers::axum_logout_handler::<S>))
+            .route(
+                "/auth/logout",
+                get(helpers::axum_logout_handler::<AppState, S, T>),
+            )
     }
 }

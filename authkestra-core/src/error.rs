@@ -27,6 +27,9 @@ pub enum AuthError {
     /// An error occurred during OIDC discovery
     #[error("Discovery error: {0}")]
     Discovery(String),
+    /// A required component (e.g., SessionManager, TokenManager) is missing
+    #[error("Missing component: {0}")]
+    ComponentMissing(String),
 }
 
 /// Represents an error response from an OAuth2 provider.

@@ -165,9 +165,9 @@ pub async fn handle_oauth_callback_erased(
         .finish())
 }
 
-pub async fn actix_login_handler(
+pub async fn actix_login_handler<S, T>(
     path: web::Path<String>,
-    authkestra: web::Data<Authkestra>,
+    authkestra: web::Data<Authkestra<S, T>>,
 ) -> impl actix_web::Responder {
     let provider = path.into_inner();
     let flow = match authkestra.providers.get(&provider) {
@@ -180,12 +180,15 @@ pub async fn actix_login_handler(
     initiate_oauth_login_erased(flow.as_ref(), &authkestra.session_config, &[])
 }
 
-pub async fn actix_callback_handler(
+pub async fn actix_callback_handler<S, T>(
     req: HttpRequest,
     path: web::Path<String>,
-    authkestra: web::Data<Authkestra>,
+    authkestra: web::Data<Authkestra<S, T>>,
     params: web::Query<OAuthCallbackParams>,
-) -> actix_web::Result<impl actix_web::Responder> {
+) -> actix_web::Result<impl actix_web::Responder>
+where
+    S: authkestra_flow::SessionStoreState,
+{
     let provider = path.into_inner();
     let flow = match authkestra.providers.get(&provider) {
         Some(f) => f,
@@ -198,20 +201,29 @@ pub async fn actix_callback_handler(
         req,
         flow.as_ref(),
         params.into_inner(),
-        authkestra.session_store.clone(),
+        authkestra
+            .session_store
+            .get_store()
+            .ok_or_else(|| actix_web::error::ErrorInternalServerError("Session store not configured"))?,
         authkestra.session_config.clone(),
         "/",
     )
     .await
 }
 
-pub async fn actix_logout_handler(
+pub async fn actix_logout_handler<S, T>(
     req: HttpRequest,
-    authkestra: web::Data<Authkestra>,
-) -> actix_web::Result<impl actix_web::Responder> {
+    authkestra: web::Data<Authkestra<S, T>>,
+) -> actix_web::Result<impl actix_web::Responder>
+where
+    S: authkestra_flow::SessionStoreState,
+{
     logout(
         req,
-        authkestra.session_store.clone(),
+        authkestra
+            .session_store
+            .get_store()
+            .ok_or_else(|| actix_web::error::ErrorInternalServerError("Session store not configured"))?,
         authkestra.session_config.clone(),
         "/",
     )

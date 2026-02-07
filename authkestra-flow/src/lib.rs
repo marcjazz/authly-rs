@@ -17,7 +17,38 @@ pub use authkestra_core::ErasedOAuthFlow;
 use authkestra_core::{
     error::AuthError, state::Identity, CredentialsProvider, OAuthProvider, UserMapper,
 };
-use authkestra_session::{MemoryStore, SessionConfig, SessionStore};
+use authkestra_session::{Session, SessionConfig, SessionStore};
+pub use chrono;
+
+/// Trait for components that can be used as a session store.
+pub trait SessionStoreState: Send + Sync + 'static {
+    /// Returns the session store if configured.
+    fn get_store(&self) -> Option<Arc<dyn SessionStore>>;
+}
+
+impl SessionStoreState for Missing {
+    fn get_store(&self) -> Option<Arc<dyn SessionStore>> {
+        None
+    }
+}
+
+impl SessionStoreState for Configured<Arc<dyn SessionStore>> {
+    fn get_store(&self) -> Option<Arc<dyn SessionStore>> {
+        Some(self.0.clone())
+    }
+}
+
+/// Trait for components that can be used as a token manager.
+pub trait TokenManagerState: Send + Sync + 'static {
+    /// Returns the token manager if configured.
+    fn get_manager(&self) -> Arc<TokenManager>;
+}
+
+impl TokenManagerState for Configured<Arc<TokenManager>> {
+    fn get_manager(&self) -> Arc<TokenManager> {
+        self.0.clone()
+    }
+}
 use authkestra_token::TokenManager;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -33,36 +64,121 @@ pub use client_credentials_flow::ClientCredentialsFlow;
 pub use device_flow::{DeviceAuthorizationResponse, DeviceFlow};
 pub use oauth2::OAuth2Flow;
 
+/// Marker for a missing component in the typestate pattern.
+#[derive(Clone, Default)]
+pub struct Missing;
+
+/// Marker for a configured component in the typestate pattern.
+#[derive(Clone)]
+pub struct Configured<T>(pub T);
+
 /// The unified Authkestra service.
 #[derive(Clone)]
-pub struct Authkestra {
+pub struct Authkestra<S = Missing, T = Missing> {
     /// Map of registered OAuth providers.
     pub providers: HashMap<String, Arc<dyn ErasedOAuthFlow>>,
     /// The session storage backend.
-    pub session_store: Arc<dyn SessionStore>,
+    pub session_store: S,
     /// Configuration for session cookies.
     pub session_config: SessionConfig,
     /// Manager for JWT signing and verification.
-    pub token_manager: Arc<TokenManager>,
+    pub token_manager: T,
 }
 
-impl Authkestra {
+impl Authkestra<Missing, Missing> {
     /// Create a new [`AuthkestraBuilder`] to configure the service.
-    pub fn builder() -> AuthkestraBuilder {
+    pub fn builder() -> AuthkestraBuilder<Missing, Missing> {
         AuthkestraBuilder::default()
+    }
+
+    /// Create a builder pre-configured for a traditional web application (OIDC Client).
+    ///
+    /// This sets up a [`authkestra_session::MemoryStore`] by default.
+    pub fn client() -> AuthkestraBuilder<Configured<Arc<dyn SessionStore>>, Missing> {
+        Self::builder().session_store(Arc::new(authkestra_session::MemoryStore::default()))
+    }
+
+    /// Create a builder pre-configured for a traditional web application.
+    ///
+    /// This is an alias for [`Self::client()`].
+    pub fn web_app() -> AuthkestraBuilder<Configured<Arc<dyn SessionStore>>, Missing> {
+        Self::client()
+    }
+
+    /// Create a builder pre-configured for a Single Page Application (SPA) or Mobile App.
+    ///
+    /// This sets up a [`TokenManager`] with the provided secret key.
+    pub fn spa(jwt_secret: &[u8]) -> AuthkestraBuilder<Missing, Configured<Arc<TokenManager>>> {
+        Self::builder().jwt_secret(jwt_secret)
+    }
+
+    /// Create a builder pre-configured for a Resource Server (API).
+    ///
+    /// This sets up a [`TokenManager`] for token validation.
+    pub fn resource_server(
+        jwt_secret: &[u8],
+    ) -> AuthkestraBuilder<Missing, Configured<Arc<TokenManager>>> {
+        Self::builder().jwt_secret(jwt_secret)
+    }
+}
+
+impl<T> Authkestra<Configured<Arc<dyn SessionStore>>, T> {
+    /// Create a new session for the given identity.
+    pub async fn create_session(&self, identity: Identity) -> Result<Session, AuthError> {
+        let session_duration = self
+            .session_config
+            .max_age
+            .unwrap_or(chrono::Duration::hours(24));
+        let session = Session {
+            id: uuid::Uuid::new_v4().to_string(),
+            identity,
+            expires_at: chrono::Utc::now() + session_duration,
+        };
+
+        self.session_store
+            .0
+            .save_session(&session)
+            .await
+            .map_err(|e| AuthError::Session(e.to_string()))?;
+
+        Ok(session)
+    }
+}
+
+impl<S> Authkestra<S, Configured<Arc<TokenManager>>> {
+    /// Issue a JWT for the given identity.
+    pub fn issue_token(
+        &self,
+        identity: Identity,
+        expires_in_secs: u64,
+    ) -> Result<String, AuthError> {
+        self.token_manager
+            .0
+            .issue_user_token(identity, expires_in_secs, None)
+            .map_err(|e| AuthError::Token(e.to_string()))
     }
 }
 
 /// A builder for configuring and creating an [`Authkestra`] instance.
-#[derive(Default)]
-pub struct AuthkestraBuilder {
+pub struct AuthkestraBuilder<S, T> {
     providers: HashMap<String, Arc<dyn ErasedOAuthFlow>>,
-    session_store: Option<Arc<dyn SessionStore>>,
+    session_store: S,
     session_config: SessionConfig,
-    token_manager: Option<Arc<TokenManager>>,
+    token_manager: T,
 }
 
-impl AuthkestraBuilder {
+impl Default for AuthkestraBuilder<Missing, Missing> {
+    fn default() -> Self {
+        Self {
+            providers: HashMap::new(),
+            session_store: Missing,
+            session_config: SessionConfig::default(),
+            token_manager: Missing,
+        }
+    }
+}
+
+impl<S, T> AuthkestraBuilder<S, T> {
     /// Register an OAuth provider flow.
     pub fn provider<P, M>(mut self, flow: OAuth2Flow<P, M>) -> Self
     where
@@ -74,38 +190,123 @@ impl AuthkestraBuilder {
         self
     }
 
-    /// Set the session store.
-    pub fn session_store(mut self, store: Arc<dyn SessionStore>) -> Self {
-        self.session_store = Some(store);
-        self
-    }
-
     /// Set the session configuration.
     pub fn session_config(mut self, config: SessionConfig) -> Self {
         self.session_config = config;
         self
     }
 
+    /// Set the session store.
+    pub fn session_store(
+        self,
+        store: Arc<dyn SessionStore>,
+    ) -> AuthkestraBuilder<Configured<Arc<dyn SessionStore>>, T> {
+        AuthkestraBuilder {
+            providers: self.providers,
+            session_store: Configured(store),
+            session_config: self.session_config,
+            token_manager: self.token_manager,
+        }
+    }
+
     /// Set the token manager.
-    pub fn token_manager(mut self, manager: Arc<TokenManager>) -> Self {
-        self.token_manager = Some(manager);
-        self
+    pub fn token_manager(
+        self,
+        manager: Arc<TokenManager>,
+    ) -> AuthkestraBuilder<S, Configured<Arc<TokenManager>>> {
+        AuthkestraBuilder {
+            providers: self.providers,
+            session_store: self.session_store,
+            session_config: self.session_config,
+            token_manager: Configured(manager),
+        }
+    }
+
+    /// Set the JWT secret for the default token manager.
+    pub fn jwt_secret(self, secret: &[u8]) -> AuthkestraBuilder<S, Configured<Arc<TokenManager>>> {
+        self.token_manager(Arc::new(TokenManager::new(secret, None)))
+    }
+
+    /// Set the JWT issuer for the token manager.
+    ///
+    /// This is only available if a token manager is already configured.
+    pub fn jwt_issuer(
+        self,
+        issuer: impl Into<String>,
+    ) -> AuthkestraBuilder<S, Configured<Arc<TokenManager>>>
+    where
+        T: TokenManagerState,
+    {
+        let manager = Arc::new(
+            (*self.token_manager.get_manager())
+                .clone()
+                .with_issuer(issuer.into()),
+        );
+        self.token_manager(manager)
     }
 
     /// Build the [`Authkestra`] instance.
-    pub fn build(self) -> Authkestra {
+    pub fn build(self) -> Authkestra<S, T> {
         Authkestra {
             providers: self.providers,
-            session_store: self
-                .session_store
-                .unwrap_or_else(|| Arc::new(MemoryStore::default())),
+            session_store: self.session_store,
             session_config: self.session_config,
-            token_manager: self
-                .token_manager
-                .unwrap_or_else(|| Arc::new(TokenManager::new(b"secret", None))),
+            token_manager: self.token_manager,
         }
     }
 }
+
+/// Trait for Authkestra instances that have a session store configured.
+pub trait HasSessionStore {
+    /// Returns the session store.
+    fn session_store(&self) -> Arc<dyn SessionStore>;
+}
+
+impl<T> HasSessionStore for Authkestra<Configured<Arc<dyn SessionStore>>, T> {
+    fn session_store(&self) -> Arc<dyn SessionStore> {
+        self.session_store.0.clone()
+    }
+}
+
+/// Trait for Authkestra instances that have a token manager configured.
+pub trait HasTokenManager {
+    /// Returns the token manager.
+    fn token_manager(&self) -> Arc<TokenManager>;
+}
+
+impl<S> HasTokenManager for Authkestra<S, Configured<Arc<TokenManager>>> {
+    fn token_manager(&self) -> Arc<TokenManager> {
+        self.token_manager.0.clone()
+    }
+}
+
+/// Marker for a configured session store.
+pub type HasSessionStoreMarker = Configured<Arc<dyn SessionStore>>;
+/// Marker for a missing session store.
+pub type NoSessionStoreMarker = Missing;
+/// Marker for a configured token manager.
+pub type HasTokenManagerMarker = Configured<Arc<TokenManager>>;
+/// Marker for a missing token manager.
+pub type NoTokenManagerMarker = Missing;
+
+/// A full OIDC client with session support.
+///
+/// This type is typically used in traditional web applications where the server
+/// manages user sessions.
+pub type AuthkestraClient = Authkestra<HasSessionStoreMarker, NoTokenManagerMarker>;
+
+/// A Single Page Application (SPA) or Mobile App client.
+///
+/// This type uses JWTs for authentication instead of server-side sessions.
+pub type AuthkestraSpa = Authkestra<NoSessionStoreMarker, HasTokenManagerMarker>;
+
+/// A Resource Server (API) that validates tokens.
+///
+/// This type is used for APIs that need to verify JWTs issued by an authorization server.
+pub type AuthkestraResourceServer = Authkestra<NoSessionStoreMarker, HasTokenManagerMarker>;
+
+/// A client that supports both sessions and token issuance.
+pub type AuthkestraFull = Authkestra<HasSessionStoreMarker, HasTokenManagerMarker>;
 
 /// Orchestrates a direct credentials flow.
 pub struct CredentialsFlow<P: CredentialsProvider, M: UserMapper = ()> {

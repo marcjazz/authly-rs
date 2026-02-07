@@ -1,5 +1,5 @@
 use actix_web::{dev::Payload, http::header, web, Error, FromRequest, HttpRequest};
-use authkestra_flow::Authkestra;
+use authkestra_flow::{Authkestra, Missing, SessionStoreState, TokenManagerState};
 use authkestra_session::{Session, SessionConfig, SessionStore};
 use authkestra_token::TokenManager;
 use futures::future::LocalBoxFuture;
@@ -8,19 +8,23 @@ use std::sync::Arc;
 pub mod helpers;
 pub use helpers::*;
 
-pub trait AuthkestraActixExt {
+pub trait AuthkestraActixExt<S, T> {
     fn actix_scope(&self) -> actix_web::Scope;
 }
 
-impl AuthkestraActixExt for Authkestra {
+impl<S, T> AuthkestraActixExt<S, T> for Authkestra<S, T>
+where
+    S: Clone + SessionStoreState + 'static,
+    T: Clone + 'static,
+{
     fn actix_scope(&self) -> actix_web::Scope {
         web::scope("/auth")
-            .route("/{provider}", web::get().to(actix_login_handler))
+            .route("/{provider}", web::get().to(actix_login_handler::<S, T>))
             .route(
                 "/{provider}/callback",
-                web::get().to(actix_callback_handler),
+                web::get().to(actix_callback_handler::<S, T>),
             )
-            .route("/logout", web::get().to(actix_logout_handler))
+            .route("/logout", web::get().to(actix_logout_handler::<S, T>))
     }
 }
 
@@ -32,9 +36,43 @@ impl FromRequest for AuthSession {
     type Future = LocalBoxFuture<'static, Result<Self, Self::Error>>;
 
     fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
-        let store = req.app_data::<web::Data<Arc<dyn SessionStore>>>().cloned();
+        let store = req
+            .app_data::<web::Data<Arc<dyn SessionStore>>>()
+            .cloned()
+            .or_else(|| {
+                req.app_data::<web::Data<
+                    Authkestra<authkestra_flow::Configured<Arc<dyn SessionStore>>, Missing>,
+                >>()
+                .and_then(|a| a.session_store.get_store().map(web::Data::new))
+            })
+            .or_else(|| {
+                req.app_data::<web::Data<
+                    Authkestra<
+                        authkestra_flow::Configured<Arc<dyn SessionStore>>,
+                        authkestra_flow::Configured<Arc<TokenManager>>,
+                    >,
+                >>()
+                .and_then(|a| a.session_store.get_store().map(web::Data::new))
+            });
 
-        let config = req.app_data::<web::Data<SessionConfig>>().cloned();
+        let config = req
+            .app_data::<web::Data<SessionConfig>>()
+            .cloned()
+            .or_else(|| {
+                req.app_data::<web::Data<
+                    Authkestra<authkestra_flow::Configured<Arc<dyn SessionStore>>, Missing>,
+                >>()
+                .map(|a| web::Data::new(a.session_config.clone()))
+            })
+            .or_else(|| {
+                req.app_data::<web::Data<
+                    Authkestra<
+                        authkestra_flow::Configured<Arc<dyn SessionStore>>,
+                        authkestra_flow::Configured<Arc<TokenManager>>,
+                    >,
+                >>()
+                .map(|a| web::Data::new(a.session_config.clone()))
+            });
 
         let session_id = req
             .cookie(
@@ -78,7 +116,24 @@ impl FromRequest for AuthToken {
     type Future = LocalBoxFuture<'static, Result<Self, Self::Error>>;
 
     fn from_request(req: &HttpRequest, _payload: &mut Payload) -> Self::Future {
-        let token_manager = req.app_data::<web::Data<Arc<TokenManager>>>().cloned();
+        let token_manager = req
+            .app_data::<web::Data<Arc<TokenManager>>>()
+            .cloned()
+            .or_else(|| {
+                req.app_data::<web::Data<
+                        Authkestra<Missing, authkestra_flow::Configured<Arc<TokenManager>>>,
+                    >>()
+                    .and_then(|a| Some(web::Data::new(a.token_manager.get_manager())))
+            })
+            .or_else(|| {
+                req.app_data::<web::Data<
+                    Authkestra<
+                        authkestra_flow::Configured<Arc<dyn SessionStore>>,
+                        authkestra_flow::Configured<Arc<TokenManager>>,
+                    >,
+                >>()
+                .and_then(|a| Some(web::Data::new(a.token_manager.get_manager())))
+            });
 
         let auth_header = req
             .headers()
@@ -88,7 +143,7 @@ impl FromRequest for AuthToken {
 
         Box::pin(async move {
             let token_manager = token_manager.ok_or_else(|| {
-                actix_web::error::ErrorInternalServerError("TokenManager not configured")
+                actix_web::error::ErrorInternalServerError("Token manager not configured")
             })?;
             let auth_header = auth_header.ok_or_else(|| {
                 actix_web::error::ErrorUnauthorized("Missing Authorization header")

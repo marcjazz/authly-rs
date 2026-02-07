@@ -1,10 +1,9 @@
 use authkestra_axum::{
     helpers::{handle_oauth_callback_jwt_erased, initiate_oauth_login, OAuthCallbackParams},
-    AuthToken, SessionConfig,
+    AuthToken, AuthkestraAxumError,
 };
-use authkestra_flow::{Authkestra, OAuth2Flow};
+use authkestra::{AuthkestraSpa, AuthkestraSpaState, flow::{Authkestra, HasTokenManager, OAuth2Flow}};
 use authkestra_providers_github::GithubProvider;
-use authkestra_token::TokenManager;
 use axum::{
     extract::{FromRef, Query, State},
     response::{Html, IntoResponse},
@@ -28,12 +27,40 @@ use tower_cookies::{CookieManagerLayer, Cookies};
 
 #[derive(Clone)]
 struct AppState {
-    authkestra: Authkestra,
+    authkestra: AuthkestraSpa,
 }
 
-impl FromRef<AppState> for Arc<TokenManager> {
+impl FromRef<AppState> for AuthkestraSpaState {
     fn from_ref(state: &AppState) -> Self {
-        state.authkestra.token_manager.clone()
+        AuthkestraSpaState::from(state.authkestra.clone())
+    }
+}
+
+impl FromRef<AppState> for AuthkestraSpa {
+    fn from_ref(state: &AppState) -> Self {
+        state.authkestra.clone()
+    }
+}
+
+impl FromRef<AppState> for Result<Arc<dyn authkestra_session::SessionStore>, AuthkestraAxumError> {
+    fn from_ref(state: &AppState) -> Self {
+        Result::<Arc<dyn authkestra_session::SessionStore>, AuthkestraAxumError>::from_ref(
+            &AuthkestraSpaState::from(state.authkestra.clone()),
+        )
+    }
+}
+
+impl FromRef<AppState> for Result<Arc<authkestra_token::TokenManager>, AuthkestraAxumError> {
+    fn from_ref(state: &AppState) -> Self {
+        Result::<Arc<authkestra_token::TokenManager>, AuthkestraAxumError>::from_ref(
+            &AuthkestraSpaState::from(state.authkestra.clone()),
+        )
+    }
+}
+
+impl FromRef<AppState> for authkestra_session::SessionConfig {
+    fn from_ref(state: &AppState) -> Self {
+        state.authkestra.session_config.clone()
     }
 }
 
@@ -53,7 +80,7 @@ async fn main() {
         .unwrap_or_else(|_| "http://localhost:3000/".to_string());
 
     // 2. Setup Authkestra and TokenManager
-    let token_manager = Arc::new(TokenManager::new(
+    let token_manager = Arc::new(authkestra_token::TokenManager::new(
         b"a-very-secret-key-that-is-at-least-32-bytes-long!!",
         None,
     ));
@@ -66,11 +93,6 @@ async fn main() {
         .token_manager(token_manager)
         .build();
 
-    let _session_config = SessionConfig {
-        secure: false, // Set to true in production
-        ..Default::default()
-    };
-
     let state = AppState { authkestra };
 
     // 3. Build Axum Router
@@ -78,10 +100,7 @@ async fn main() {
         .route("/", get(frontend))
         .route("/auth/login", get(login_handler))
         .route("/auth/logout", get(logout_handler))
-        .route(
-            "/api/callback",
-            get(callback_handler).post(callback_handler),
-        )
+        .route("/api/callback", get(callback_handler).post(callback_handler))
         .route("/api/protected", get(protected_resource))
         .layer(CookieManagerLayer::new())
         .with_state(state);
@@ -196,7 +215,10 @@ async fn frontend() -> impl IntoResponse {
 
 /// Initiates the OAuth login flow.
 /// This endpoint is called by the frontend to start the process.
-async fn login_handler(State(state): State<AppState>, cookies: Cookies) -> impl IntoResponse {
+async fn login_handler(
+    State(state): State<AppState>,
+    cookies: Cookies,
+) -> impl IntoResponse {
     let flow = &state.authkestra.providers["github"];
 
     // We request 'user:email' scope
@@ -231,7 +253,7 @@ async fn callback_handler(
         flow,
         cookies,
         params,
-        state.authkestra.token_manager.clone(),
+        state.authkestra.token_manager(),
         3600, // JWT expires in 1 hour
         &state.authkestra.session_config,
     )

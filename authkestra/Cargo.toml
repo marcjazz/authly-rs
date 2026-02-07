@@ -20,6 +20,9 @@ authkestra-providers-github = { version = "0.1.1", path = "../authkestra-provide
 authkestra-providers-google = { version = "0.1.1", path = "../authkestra-providers-google", optional = true }
 authkestra-providers-discord = { version = "0.1.1", path = "../authkestra-providers-discord", optional = true }
 
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+
 [features]
 default = []
 full = ["flow", "session", "token", "oidc", "axum", "actix", "github", "google", "discord"]

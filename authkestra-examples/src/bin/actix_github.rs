@@ -1,14 +1,15 @@
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use authkestra_actix::{AuthSession, AuthkestraActixExt};
-use authkestra_flow::{Authkestra, OAuth2Flow};
+use authkestra_flow::{Authkestra, OAuth2Flow, Missing};
 use authkestra_providers_github::GithubProvider;
 use authkestra_session::SqlStore;
 use authkestra_session::{SessionConfig, SessionStore};
 use sqlx::sqlite::SqlitePool;
 use std::sync::Arc;
 
-struct AppState {
-    authkestra: Authkestra,
+#[allow(dead_code)]
+struct AppState<S = Missing, T = Missing> {
+    authkestra: Authkestra<S, T>,
 }
 
 #[get("/")]
@@ -72,22 +73,19 @@ async fn main() -> std::io::Result<()> {
         .session_store(session_store.clone())
         .build();
 
-    let app_state = web::Data::new(AppState { authkestra });
-
-    // We also need to register the store and config separately for the extractor
-    let store_data: web::Data<Arc<dyn SessionStore>> = web::Data::new(session_store.clone());
-    let config_data: web::Data<SessionConfig> = web::Data::new(SessionConfig::default());
-    let authkestra_data = web::Data::new(app_state.authkestra.clone());
+    let app_state = web::Data::new(AppState {
+        authkestra: authkestra.clone(),
+    });
 
     println!("Starting server on http://localhost:3000");
     HttpServer::new(move || {
         App::new()
             .app_data(app_state.clone())
-            .app_data(store_data.clone())
-            .app_data(config_data.clone())
-            .app_data(authkestra_data.clone())
+            .app_data(web::Data::new(authkestra.clone()))
+            .app_data(web::Data::new(session_store.clone()))
+            .app_data(web::Data::new(SessionConfig::default()))
             .service(index)
-            .service(app_state.authkestra.actix_scope())
+            .service(authkestra.actix_scope())
             .service(protected)
     })
     .bind(("0.0.0.0", 3000))?
