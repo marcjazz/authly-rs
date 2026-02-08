@@ -18,7 +18,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-authkestra-session = { version = "0.1.0", features = ["sqlite"] }
+authkestra-session = { version = "0.1.1", features = ["sqlite"] }
 ```
 
 ### Feature Flags

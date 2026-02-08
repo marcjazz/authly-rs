@@ -17,8 +17,8 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-authkestra-providers-github = "0.1.0"
-authkestra-core = "0.1.0"
+authkestra-providers-github = "0.1.1"
+authkestra-core = "0.1.1"
 ```
 
 ### Example

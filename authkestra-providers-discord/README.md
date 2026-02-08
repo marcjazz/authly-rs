@@ -18,7 +18,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-authkestra-providers-discord = "0.1.0"
+authkestra-providers-discord = "0.1.1"
 ```
 
 ### Example

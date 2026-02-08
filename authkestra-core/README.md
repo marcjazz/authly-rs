@@ -20,7 +20,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-authkestra-core = "0.1.0"
+authkestra-core = "0.1.1"
 ```
 
 ### Core Traits

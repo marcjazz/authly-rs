@@ -17,7 +17,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-authkestra-token = "0.1.0"
+authkestra-token = "0.1.1"
 ```
 
 ### Basic Token Management (Symmetric)

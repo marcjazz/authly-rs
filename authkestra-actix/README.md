@@ -16,9 +16,9 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-authkestra-actix = "0.1.0"
-authkestra-session = "0.1.0"
-authkestra-token = "0.1.0"
+authkestra-actix = "0.1.1"
+authkestra-session = "0.1.1"
+authkestra-token = "0.1.1"
 actix-web = "4"
 ```
 

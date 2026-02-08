@@ -18,7 +18,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-authkestra-flow = "0.1.0"
+authkestra-flow = "0.1.1"
 ```
 
 ### Example: OAuth2 Flow
