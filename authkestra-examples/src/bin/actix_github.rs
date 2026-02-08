@@ -1,6 +1,6 @@
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use authkestra_actix::{AuthSession, AuthkestraActixExt};
-use authkestra_flow::{Authkestra, OAuth2Flow, Missing};
+use authkestra_flow::{Authkestra, Missing, OAuth2Flow};
 use authkestra_providers_github::GithubProvider;
 use authkestra_session::SqlStore;
 use authkestra_session::{SessionConfig, SessionStore};
@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 #[allow(dead_code)]
 struct AppState<S = Missing, T = Missing> {
-    authkestra: Authkestra<S, T>,
+    authkestra: Authkestra<S, T>, // can be staleless or statefull
 }
 
 #[get("/")]

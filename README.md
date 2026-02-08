@@ -48,6 +48,7 @@ To see Authkestra in action, check out the [examples](examples/) directory:
 - [Axum with GitHub OAuth](examples/axum_oauth.rs)
 - [Actix with GitHub OAuth](examples/actix_github.rs)
 - [OIDC Generic Provider](examples/oidc_generic.rs)
+- [Stateless OIDC Client](examples/oidc_stateless.rs)
 - [Device Flow](examples/device_flow.rs)
 
 ## �️ Technical Design Principles

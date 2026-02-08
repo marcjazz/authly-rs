@@ -10,14 +10,14 @@
 /// 6. The backend uses `handle_oauth_callback_jwt` to exchange the code for a JWT and returns it to the frontend.
 /// 7. The frontend stores the JWT (e.g., in localStorage) and uses it for subsequent API calls.
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use authkestra::flow::{Authkestra, HasTokenManager, OAuth2Flow, StatelessAuthkestra};
 use authkestra_actix::{
     handle_oauth_callback_jwt_erased, initiate_oauth_login_erased, AuthToken, OAuthCallbackParams,
 };
-use authkestra::{AuthkestraSpa, flow::{Authkestra, HasTokenManager, OAuth2Flow}};
 use authkestra_providers_github::GithubProvider;
 
 struct AppState {
-    authkestra: AuthkestraSpa,
+    authkestra: StatelessAuthkestra,
 }
 
 #[get("/")]
@@ -113,9 +113,7 @@ async fn frontend() -> impl Responder {
 }
 
 #[get("/auth/login")]
-async fn login_handler(
-    data: web::Data<AppState>,
-) -> impl Responder {
+async fn login_handler(data: web::Data<AppState>) -> impl Responder {
     let flow = &data.authkestra.providers["github"];
     initiate_oauth_login_erased(flow, &data.authkestra.session_config, &["user:email"])
 }
@@ -167,7 +165,8 @@ async fn main() -> std::io::Result<()> {
     let redirect_uri = std::env::var("AUTHKESTRA_GITHUB_REDIRECT_URI")
         .unwrap_or_else(|_| "http://localhost:3000/".to_string());
 
-    let authkestra = Authkestra::spa(b"a-very-secret-key-that-is-at-least-32-bytes-long!!")
+    let authkestra = Authkestra::builder()
+        .jwt_secret(b"a-very-secret-key-that-is-at-least-32-bytes-long!!")
         .provider(OAuth2Flow::new(GithubProvider::new(
             client_id,
             client_secret,

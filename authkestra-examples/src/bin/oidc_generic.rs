@@ -1,6 +1,7 @@
-use authkestra_axum::{AuthSession, AuthkestraAxumExt};
-use authkestra::{AuthkestraClientState, flow::{Authkestra, OAuth2Flow}};
+use authkestra::flow::{Authkestra, OAuth2Flow};
+use authkestra_axum::{AuthSession, AuthkestraAxumExt, AuthkestraState};
 use authkestra_oidc::OidcProvider;
+use authkestra_session::{MemoryStore, RedisStore};
 use axum::{response::IntoResponse, routing::get, Router};
 use std::sync::Arc;
 use tower_cookies::CookieManagerLayer;
@@ -21,13 +22,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Demonstrate initialization/discovery
     let provider = OidcProvider::discover(client_id, client_secret, redirect_uri, &issuer).await?;
 
-    let mut builder = Authkestra::web_app();
+    let mut builder = Authkestra::builder().session_store(Arc::new(MemoryStore::default()));
 
     // Use Redis if REDIS_URL is set
     if let Ok(redis_url) = std::env::var("REDIS_URL") {
         println!("Using RedisStore at {}", redis_url);
-        let redis_store =
-            Arc::new(authkestra_session::RedisStore::new(&redis_url, "authkestra".into()).unwrap());
+        let redis_store = Arc::new(RedisStore::new(&redis_url, "authkestra".into()).unwrap());
         builder = builder.session_store(redis_store);
     } else {
         println!("Using MemoryStore");
@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let authkestra = builder.provider(OAuth2Flow::new(provider)).build();
 
-    let state = AuthkestraClientState::from(authkestra);
+    let state = AuthkestraState::from(authkestra);
 
     let app = Router::new()
         .route("/", get(index))

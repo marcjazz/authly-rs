@@ -201,10 +201,7 @@ where
         req,
         flow.as_ref(),
         params.into_inner(),
-        authkestra
-            .session_store
-            .get_store()
-            .ok_or_else(|| actix_web::error::ErrorInternalServerError("Session store not configured"))?,
+        authkestra.session_store.get_store(),
         authkestra.session_config.clone(),
         "/",
     )
@@ -220,10 +217,7 @@ where
 {
     logout(
         req,
-        authkestra
-            .session_store
-            .get_store()
-            .ok_or_else(|| actix_web::error::ErrorInternalServerError("Session store not configured"))?,
+        authkestra.session_store.get_store(),
         authkestra.session_config.clone(),
         "/",
     )

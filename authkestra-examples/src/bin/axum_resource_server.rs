@@ -1,4 +1,5 @@
 use authkestra_axum::Jwt;
+use authkestra_core::discovery::ProviderMetadata;
 use authkestra_token::offline_validation::JwksCache;
 use axum::{extract::FromRef, response::IntoResponse, routing::get, Router};
 use jsonwebtoken::{Algorithm, Validation};
@@ -38,8 +39,12 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     // 1. Configure the OIDC provider's JWKS URI
-    let jwks_uri = std::env::var("OIDC_JWKS_URI")
-        .unwrap_or_else(|_| "https://www.googleapis.com/oauth2/v3/certs".to_string());
+    let issuer =
+        std::env::var("OIDC_ISSUER").unwrap_or_else(|_| "https://accounts.google.com".to_string());
+    let ProviderMetadata { jwks_uri, .. } =
+        ProviderMetadata::discover(&issuer, reqwest::Client::new())
+            .await
+            .expect("Provider metadata discovery failed!");
 
     println!("🚀 Starting Axum Resource Server...");
     println!("🔑 Using JWKS URI: {}", jwks_uri);

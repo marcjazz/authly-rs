@@ -1,9 +1,10 @@
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use async_trait::async_trait;
+use authkestra::flow::CredentialsFlow;
 use authkestra_actix::AuthSession;
-use authkestra_session::SessionStore;
 use authkestra_core::{error::AuthError, state::Identity, CredentialsProvider, UserMapper};
-use authkestra::{AuthkestraClient, flow::{Authkestra, CredentialsFlow}};
+use authkestra_flow::{Authkestra, StatefullAuthkestra};
+use authkestra_session::SessionStore;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -63,7 +64,7 @@ impl UserMapper for MyUserMapper {
 // 4. App State
 struct AppState {
     auth_flow: Arc<CredentialsFlow<MyCredentialsProvider, MyUserMapper>>,
-    authkestra: AuthkestraClient,
+    authkestra: StatefullAuthkestra,
 }
 
 #[get("/")]

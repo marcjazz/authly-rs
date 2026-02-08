@@ -1,10 +1,12 @@
 use async_trait::async_trait;
-use authkestra_axum::AuthSession;
+use authkestra::flow::{Authkestra, CredentialsFlow};
+use authkestra_axum::{AuthSession, AuthkestraAxumError};
 use authkestra_core::{error::AuthError, state::Identity, CredentialsProvider, UserMapper};
-use authkestra::{AuthkestraClient, AuthkestraClientState, flow::{Authkestra, CredentialsFlow}};
+use authkestra_flow::{Configured, Missing};
 use authkestra_session::{MemoryStore, SessionConfig, SessionStore};
+use authkestra_token::TokenManager;
 use axum::{
-    extract::{Form, State},
+    extract::{Form, FromRef, State},
     response::{IntoResponse, Redirect},
     routing::{get, post},
     Router,
@@ -77,36 +79,38 @@ impl UserMapper for SqlxUserMapper {
 
 // 4. App State
 #[derive(Clone)]
-struct AppState {
+struct AppState<S = Missing, T = Missing> {
     auth_flow: Arc<CredentialsFlow<MyCredentialsProvider, SqlxUserMapper>>,
-    authkestra: AuthkestraClient,
+    authkestra: Authkestra<S, T>,
 }
 
-impl axum::extract::FromRef<AppState> for AuthkestraClient {
-    fn from_ref(state: &AppState) -> Self {
+impl<S: Clone, T: Clone> FromRef<AppState<S, T>> for Authkestra<S, T> {
+    fn from_ref(state: &AppState<S, T>) -> Self {
         state.authkestra.clone()
     }
 }
 
-impl axum::extract::FromRef<AppState> for AuthkestraClientState {
-    fn from_ref(state: &AppState) -> Self {
-        AuthkestraClientState::from(state.authkestra.clone())
-    }
-}
-
-impl axum::extract::FromRef<AppState>
-    for Result<Arc<dyn SessionStore>, authkestra_axum::AuthkestraAxumError>
+impl<S, T> FromRef<AppState<S, T>> for Result<Arc<dyn SessionStore>, AuthkestraAxumError>
+where
+    S: authkestra_flow::SessionStoreState,
 {
-    fn from_ref(state: &AppState) -> Self {
-        Result::<Arc<dyn SessionStore>, authkestra_axum::AuthkestraAxumError>::from_ref(
-            &AuthkestraClientState::from(state.authkestra.clone()),
-        )
+    fn from_ref(state: &AppState<S, T>) -> Self {
+        Ok(state.authkestra.session_store.get_store())
     }
 }
 
-impl axum::extract::FromRef<AppState> for SessionConfig {
-    fn from_ref(state: &AppState) -> Self {
+impl<S, T> FromRef<AppState<S, T>> for SessionConfig {
+    fn from_ref(state: &AppState<S, T>) -> Self {
         state.authkestra.session_config.clone()
+    }
+}
+
+impl<S, T> FromRef<AppState<S, T>> for Result<Arc<TokenManager>, AuthkestraAxumError>
+where
+    T: authkestra_flow::TokenManagerState,
+{
+    fn from_ref(state: &AppState<S, T>) -> Self {
+        Ok(state.authkestra.token_manager.get_manager())
     }
 }
 
@@ -118,9 +122,7 @@ async fn main() {
 
     let session_store = Arc::new(MemoryStore::default());
 
-    let authkestra = Authkestra::builder()
-        .session_store(session_store)
-        .build();
+    let authkestra = Authkestra::builder().session_store(session_store).build();
 
     let state = AppState {
         auth_flow,
@@ -152,10 +154,11 @@ async fn index() -> impl IntoResponse {
 }
 
 async fn login(
-    State(state): State<AppState>,
+    State(state): State<AppState<Configured<Arc<dyn SessionStore>>>>,
     cookies: Cookies,
     Form(creds): Form<LoginCredentials>,
 ) -> Result<impl IntoResponse, (axum::http::StatusCode, String)> {
+    println!("Login attempt for user: {}", creds.username);
     let (identity, local_user) = state
         .auth_flow
         .authenticate(creds)
@@ -167,11 +170,14 @@ async fn login(
         println!("Logged in as local user: {:?}", user);
     }
 
+    println!("Creating session for identity: {:?}", identity.external_id);
     let session = state
         .authkestra
         .create_session(identity)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    println!("Session created: {}", session.id);
 
     let cookie =
         authkestra_axum::helpers::create_axum_cookie(&state.authkestra.session_config, session.id);
@@ -181,6 +187,7 @@ async fn login(
 }
 
 async fn protected(AuthSession(session): AuthSession) -> impl IntoResponse {
+    println!("Accessing protected route with session: {}", session.id);
     format!(
         "Hello, {}! Your ID is {}. Session ID: {}",
         session.identity.username.unwrap_or_default(),

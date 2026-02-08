@@ -1,5 +1,5 @@
 use actix_web::{dev::Payload, http::header, web, Error, FromRequest, HttpRequest};
-use authkestra_flow::{Authkestra, Missing, SessionStoreState, TokenManagerState};
+use authkestra_flow::{Authkestra, Configured, Missing, SessionStoreState, TokenManagerState};
 use authkestra_session::{Session, SessionConfig, SessionStore};
 use authkestra_token::TokenManager;
 use futures::future::LocalBoxFuture;
@@ -40,19 +40,14 @@ impl FromRequest for AuthSession {
             .app_data::<web::Data<Arc<dyn SessionStore>>>()
             .cloned()
             .or_else(|| {
-                req.app_data::<web::Data<
-                    Authkestra<authkestra_flow::Configured<Arc<dyn SessionStore>>, Missing>,
-                >>()
-                .and_then(|a| a.session_store.get_store().map(web::Data::new))
+                req.app_data::<web::Data<Authkestra<Configured<Arc<dyn SessionStore>>, Missing>>>()
+                    .map(|a| web::Data::new(a.session_store.get_store()))
             })
             .or_else(|| {
                 req.app_data::<web::Data<
-                    Authkestra<
-                        authkestra_flow::Configured<Arc<dyn SessionStore>>,
-                        authkestra_flow::Configured<Arc<TokenManager>>,
-                    >,
+                    Authkestra<Configured<Arc<dyn SessionStore>>, Configured<Arc<TokenManager>>>,
                 >>()
-                .and_then(|a| a.session_store.get_store().map(web::Data::new))
+                .map(|a| web::Data::new(a.session_store.get_store()))
             });
 
         let config = req
@@ -66,10 +61,7 @@ impl FromRequest for AuthSession {
             })
             .or_else(|| {
                 req.app_data::<web::Data<
-                    Authkestra<
-                        authkestra_flow::Configured<Arc<dyn SessionStore>>,
-                        authkestra_flow::Configured<Arc<TokenManager>>,
-                    >,
+                    Authkestra<Configured<Arc<dyn SessionStore>>, Configured<Arc<TokenManager>>>,
                 >>()
                 .map(|a| web::Data::new(a.session_config.clone()))
             });
@@ -120,19 +112,14 @@ impl FromRequest for AuthToken {
             .app_data::<web::Data<Arc<TokenManager>>>()
             .cloned()
             .or_else(|| {
-                req.app_data::<web::Data<
-                        Authkestra<Missing, authkestra_flow::Configured<Arc<TokenManager>>>,
-                    >>()
-                    .and_then(|a| Some(web::Data::new(a.token_manager.get_manager())))
+                req.app_data::<web::Data<Authkestra<Missing, Configured<Arc<TokenManager>>>>>()
+                    .map(|a| web::Data::new(a.token_manager.get_manager()))
             })
             .or_else(|| {
                 req.app_data::<web::Data<
-                    Authkestra<
-                        authkestra_flow::Configured<Arc<dyn SessionStore>>,
-                        authkestra_flow::Configured<Arc<TokenManager>>,
-                    >,
+                    Authkestra<Configured<Arc<dyn SessionStore>>, Configured<Arc<TokenManager>>>,
                 >>()
-                .and_then(|a| Some(web::Data::new(a.token_manager.get_manager())))
+                .map(|a| web::Data::new(a.token_manager.get_manager()))
             });
 
         let auth_header = req

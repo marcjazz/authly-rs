@@ -1,18 +1,18 @@
 use authkestra::flow::Authkestra;
 use authkestra_core::state::Identity;
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[tokio::test]
 async fn test_typestate_session_flow() {
     // Start with Missing, Missing
     let builder = Authkestra::builder();
-    
+
     // Configure session store -> transitions to Configured, Missing
     let auth = builder
         .session_store(Arc::new(authkestra_session::MemoryStore::default()))
         .build();
-    
+
     // create_session should be available
     let identity = Identity {
         provider_id: "test".to_string(),
@@ -23,7 +23,7 @@ async fn test_typestate_session_flow() {
     };
     let session = auth.create_session(identity).await;
     assert!(session.is_ok());
-    
+
     // issue_token should NOT be available on this type.
     // The following would fail to compile:
     // auth.issue_token(identity, 3600);
@@ -33,12 +33,10 @@ async fn test_typestate_session_flow() {
 fn test_typestate_token_flow() {
     // Start with Missing, Missing
     let builder = Authkestra::builder();
-    
+
     // Configure token manager -> transitions to Missing, Configured
-    let auth = builder
-        .jwt_secret(b"secret")
-        .build();
-    
+    let auth = builder.jwt_secret(b"secret").build();
+
     // issue_token should be available
     let identity = Identity {
         provider_id: "test".to_string(),
@@ -49,7 +47,7 @@ fn test_typestate_token_flow() {
     };
     let token = auth.issue_token(identity, 3600);
     assert!(token.is_ok());
-    
+
     // create_session should NOT be available on this type.
     // The following would fail to compile:
     // auth.create_session(identity).await;
@@ -61,7 +59,7 @@ async fn test_typestate_full_flow() {
         .session_store(Arc::new(authkestra_session::MemoryStore::default()))
         .jwt_secret(b"secret")
         .build();
-    
+
     let identity = Identity {
         provider_id: "test".to_string(),
         external_id: "user1".to_string(),
@@ -69,7 +67,7 @@ async fn test_typestate_full_flow() {
         username: None,
         attributes: HashMap::new(),
     };
-    
+
     // Both should be available
     assert!(auth.create_session(identity.clone()).await.is_ok());
     assert!(auth.issue_token(identity, 3600).is_ok());

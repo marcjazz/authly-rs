@@ -281,14 +281,16 @@ where
     let flow: &Arc<dyn ErasedOAuthFlow> = match authkestra.providers.get(&provider) {
         Some(f) => f,
         None => {
-            return Err(AuthkestraAxumError::Internal("Provider not found".to_string()));
+            return Err(AuthkestraAxumError::Internal(
+                "Provider not found".to_string(),
+            ));
         }
     };
 
     let scopes_str = params.scope.unwrap_or_default();
     // Allow space or comma separated scopes
     let scopes: Vec<&str> = scopes_str
-        .split(|c: char| c == ' ' || c == ',')
+        .split(|c: char| [' ', ','].contains(&c))
         .filter(|s| !s.is_empty())
         .collect();
 
@@ -340,7 +342,9 @@ where
     let flow: &Arc<dyn ErasedOAuthFlow> = match authkestra.providers.get(&provider) {
         Some(f) => f,
         None => {
-            return Err(AuthkestraAxumError::Internal("Provider not found".to_string()));
+            return Err(AuthkestraAxumError::Internal(
+                "Provider not found".to_string(),
+            ));
         }
     };
 

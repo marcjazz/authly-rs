@@ -35,13 +35,7 @@ where
     S: authkestra_flow::SessionStoreState,
 {
     fn from_ref(state: &AuthkestraState<S, T>) -> Self {
-        state
-            .authkestra
-            .session_store
-            .get_store()
-            .ok_or_else(|| {
-                AuthkestraAxumError::ComponentMissing("Session store not configured".to_string())
-            })
+        Ok(state.authkestra.session_store.get_store())
     }
 }
 

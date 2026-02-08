@@ -1,17 +1,23 @@
+use std::sync::Arc;
+
+use authkestra::flow::{Authkestra, HasTokenManager, OAuth2Flow};
 use authkestra_axum::{
     helpers::{handle_oauth_callback_jwt_erased, initiate_oauth_login, OAuthCallbackParams},
-    AuthToken, AuthkestraAxumError,
+    AuthToken, AuthkestraState,
 };
-use authkestra::{AuthkestraSpa, AuthkestraSpaState, flow::{Authkestra, HasTokenManager, OAuth2Flow}};
+use authkestra_flow::{Configured, Missing};
 use authkestra_providers_github::GithubProvider;
+use authkestra_token::TokenManager;
 use axum::{
-    extract::{FromRef, Query, State},
+    extract::{Query, State},
     response::{Html, IntoResponse},
     routing::get,
     Router,
 };
-use std::sync::Arc;
 use tower_cookies::{CookieManagerLayer, Cookies};
+
+/// Authkestra state with support for session only.
+type AppState = AuthkestraState<Missing, Configured<Arc<TokenManager>>>;
 
 /// This example demonstrates a Single Page Application (SPA) authentication flow using JWTs.
 ///
@@ -24,45 +30,6 @@ use tower_cookies::{CookieManagerLayer, Cookies};
 /// 5. The frontend extracts the `code` and `state` from the URL and performs a request (e.g., POST) to the backend API `/api/callback`.
 /// 6. The backend uses `handle_oauth_callback_jwt` to exchange the code for a JWT and returns it to the frontend.
 /// 7. The frontend stores the JWT (e.g., in localStorage) and uses it for subsequent API calls.
-
-#[derive(Clone)]
-struct AppState {
-    authkestra: AuthkestraSpa,
-}
-
-impl FromRef<AppState> for AuthkestraSpaState {
-    fn from_ref(state: &AppState) -> Self {
-        AuthkestraSpaState::from(state.authkestra.clone())
-    }
-}
-
-impl FromRef<AppState> for AuthkestraSpa {
-    fn from_ref(state: &AppState) -> Self {
-        state.authkestra.clone()
-    }
-}
-
-impl FromRef<AppState> for Result<Arc<dyn authkestra_session::SessionStore>, AuthkestraAxumError> {
-    fn from_ref(state: &AppState) -> Self {
-        Result::<Arc<dyn authkestra_session::SessionStore>, AuthkestraAxumError>::from_ref(
-            &AuthkestraSpaState::from(state.authkestra.clone()),
-        )
-    }
-}
-
-impl FromRef<AppState> for Result<Arc<authkestra_token::TokenManager>, AuthkestraAxumError> {
-    fn from_ref(state: &AppState) -> Self {
-        Result::<Arc<authkestra_token::TokenManager>, AuthkestraAxumError>::from_ref(
-            &AuthkestraSpaState::from(state.authkestra.clone()),
-        )
-    }
-}
-
-impl FromRef<AppState> for authkestra_session::SessionConfig {
-    fn from_ref(state: &AppState) -> Self {
-        state.authkestra.session_config.clone()
-    }
-}
 
 #[tokio::main]
 async fn main() {
@@ -80,17 +47,14 @@ async fn main() {
         .unwrap_or_else(|_| "http://localhost:3000/".to_string());
 
     // 2. Setup Authkestra and TokenManager
-    let token_manager = Arc::new(authkestra_token::TokenManager::new(
-        b"a-very-secret-key-that-is-at-least-32-bytes-long!!",
-        None,
-    ));
     let authkestra = Authkestra::builder()
+        // jwt_secret activate the token manager as make the .jwt_issuer() available
+        .jwt_secret(b"a-very-secret-key-that-is-at-least-32-bytes-long!!")
         .provider(OAuth2Flow::new(GithubProvider::new(
             client_id,
             client_secret,
             redirect_uri,
         )))
-        .token_manager(token_manager)
         .build();
 
     let state = AppState { authkestra };
@@ -100,7 +64,10 @@ async fn main() {
         .route("/", get(frontend))
         .route("/auth/login", get(login_handler))
         .route("/auth/logout", get(logout_handler))
-        .route("/api/callback", get(callback_handler).post(callback_handler))
+        .route(
+            "/api/callback",
+            get(callback_handler).post(callback_handler),
+        )
         .route("/api/protected", get(protected_resource))
         .layer(CookieManagerLayer::new())
         .with_state(state);
@@ -215,10 +182,7 @@ async fn frontend() -> impl IntoResponse {
 
 /// Initiates the OAuth login flow.
 /// This endpoint is called by the frontend to start the process.
-async fn login_handler(
-    State(state): State<AppState>,
-    cookies: Cookies,
-) -> impl IntoResponse {
+async fn login_handler(State(state): State<AppState>, cookies: Cookies) -> impl IntoResponse {
     let flow = &state.authkestra.providers["github"];
 
     // We request 'user:email' scope

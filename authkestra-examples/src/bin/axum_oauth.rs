@@ -11,8 +11,9 @@
 //! - `AUTHKESTRA_DISCORD_CLIENT_ID`
 //! - `AUTHKESTRA_DISCORD_CLIENT_SECRET`
 
-use authkestra_axum::{AuthSession, AuthkestraAxumExt, SessionConfig};
-use authkestra::{AuthkestraClientState, flow::{Authkestra, OAuth2Flow}};
+use authkestra::flow::{Authkestra, OAuth2Flow};
+use authkestra_axum::{AuthSession, AuthkestraAxumExt, AuthkestraState, SessionConfig};
+use authkestra_flow::Configured;
 use authkestra_providers_discord::DiscordProvider;
 use authkestra_providers_github::GithubProvider;
 use authkestra_providers_google::GoogleProvider;
@@ -25,6 +26,9 @@ use axum::{
 };
 use std::sync::Arc;
 use tower_cookies::CookieManagerLayer;
+
+/// Authkestra state with support for session only.
+type AppState = AuthkestraState<Configured<Arc<dyn SessionStore>>>;
 
 #[tokio::main]
 async fn main() {
@@ -83,7 +87,9 @@ async fn main() {
         })
         .build();
 
-    let state = AuthkestraClientState::from(authkestra.clone());
+    let state = AppState {
+        authkestra: authkestra.clone(),
+    };
 
     let app = Router::new()
         .route("/", get(index))
@@ -98,9 +104,7 @@ async fn main() {
 }
 
 /// The home page showing login options based on configured providers.
-async fn index(
-    State(state): State<AuthkestraClientState>,
-) -> impl IntoResponse {
+async fn index(State(state): State<AppState>) -> impl IntoResponse {
     let mut html = String::from("<h1>Welcome to Authkestra Axum OAuth Example</h1><ul>");
     if state.authkestra.providers.contains_key("github") {
         html.push_str("<li><a href=\"/auth/github?scope=user:email&success_url=/protected\">Login with GitHub</a></li>");
